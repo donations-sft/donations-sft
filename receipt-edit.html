@@ -450,11 +450,7 @@ document.getElementById("whatsappBtn").addEventListener("click", async () => {
     a.click();
     URL.revokeObjectURL(url);
 
-    let digits = (r.donor_phone || "").replace(/\D/g, "");
-    if (digits.length === 10) digits = "91" + digits;
-    const waUrl = digits
-      ? `https://wa.me/${digits}?text=${encodeURIComponent(text)}`
-      : `https://wa.me/?text=${encodeURIComponent(text)}`;
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(waUrl, "_blank");
     alert("Receipt image downloaded. Attach it manually in WhatsApp before sending — WhatsApp doesn't accept images via this link directly.");
     shareMsg("");
