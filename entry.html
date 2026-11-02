@@ -285,6 +285,14 @@ function amountInWords(num) {
   return parts.join(" ") + " Rupees Only";
 }
 
+function formatWhatsAppNumber(phone) {
+  let digits = (phone || "").replace(/\D/g, "");
+  if (!digits) return null;
+  if (digits.length === 10) digits = "91" + digits;
+  else if (digits.length === 11 && digits.startsWith("0")) digits = "91" + digits.slice(1);
+  return digits;
+}
+
 function purposeLabel(mainId, subId, furtherId) {
   const parts = [headsIndex.nameOf(mainId)];
   if (subId) parts.push(headsIndex.nameOf(subId));
@@ -512,9 +520,12 @@ document.getElementById("whatsappBtn").addEventListener("click", async () => {
     a.click();
     URL.revokeObjectURL(url);
 
-    const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
-    window.open(waUrl, "_blank");
+    const target = formatWhatsAppNumber(r.donor_phone);
+    const waUrl = target
+      ? `https://wa.me/${target}?text=${encodeURIComponent(text)}`
+      : `https://wa.me/?text=${encodeURIComponent(text)}`;
     alert("Receipt image downloaded. Attach it manually in WhatsApp before sending — WhatsApp doesn't accept images via this link directly.");
+    window.location.href = waUrl;
     shareMsg("");
   }, "image/png");
 
