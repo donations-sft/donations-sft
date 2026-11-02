@@ -11,27 +11,380 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
 <body>
-<div class="page">
-  <div class="card">
-    <div class="brand">
-      <img src="icons/icon.svg" alt="SFT" />
-      <h1>Shroffs Foundation Trust</h1>
-      <p id="whoami">Receipt Entry</p>
+
+<div class="topbar">
+  <div class="brandline"><img src="icons/icon.svg" alt="SFT" /> Shroffs Foundation Trust</div>
+  <nav>
+    <a href="./entry.html">New Receipt</a>
+    <a href="./reports.html">Reports</a>
+    <a id="adminLink" href="./admin.html" class="hidden">Admin</a>
+  </nav>
+  <button id="logoutBtn">Log Out</button>
+</div>
+
+<div class="content">
+  <div class="wide-card" id="formCard">
+    <h2>New Donation Receipt</h2>
+
+    <label for="donorName">Donor Name *</label>
+    <input id="donorName" type="text" />
+
+    <div class="row">
+      <div>
+        <label for="donorPhone">Phone</label>
+        <input id="donorPhone" type="tel" />
+      </div>
+      <div>
+        <label for="donorCity">City</label>
+        <input id="donorCity" type="text" />
+      </div>
     </div>
-    <p>Receipt entry form is coming next.</p>
-    <button id="logoutBtn" class="secondary">Log Out</button>
+
+    <label for="donorAddress">Address</label>
+    <input id="donorAddress" type="text" />
+
+    <label for="donorPan">PAN (optional, for 80G)</label>
+    <input id="donorPan" type="text" />
+
+    <div class="row">
+      <div>
+        <label for="amount">Amount (₹) *</label>
+        <input id="amount" type="number" min="1" step="0.01" />
+      </div>
+      <div>
+        <label for="receiptDate">Date *</label>
+        <input id="receiptDate" type="date" />
+      </div>
+    </div>
+
+    <label for="paymentMode">Payment Mode *</label>
+    <select id="paymentMode">
+      <option value="cash">Cash</option>
+      <option value="cheque">Cheque / DD</option>
+      <option value="online">Online</option>
+    </select>
+
+    <div id="refFields" class="hidden">
+      <div class="row">
+        <div>
+          <label id="refNoLabel" for="refNo">Cheque / DD No.</label>
+          <input id="refNo" type="text" />
+        </div>
+        <div>
+          <label for="refDate">Dt.</label>
+          <input id="refDate" type="date" />
+        </div>
+      </div>
+      <label id="refBankLabel" for="refBank">Drawn on (Bank)</label>
+      <input id="refBank" type="text" />
+    </div>
+
+    <label for="mainHead">Head *</label>
+    <select id="mainHead"></select>
+
+    <div id="subHeadWrap" class="hidden">
+      <label for="subHead">Sub Head *</label>
+      <select id="subHead"></select>
+    </div>
+
+    <div id="furtherHeadWrap" class="hidden">
+      <label for="furtherHead">Further Head *</label>
+      <select id="furtherHead"></select>
+    </div>
+
+    <div id="formMsg"></div>
+
+    <button id="saveBtn">Save Receipt</button>
+  </div>
+
+  <div class="wide-card hidden" id="successCard">
+    <h2>Receipt Saved</h2>
+    <p>Receipt No. <strong id="savedReceiptNo"></strong> has been recorded.</p>
+    <div class="actions-row">
+      <button id="printBtn">Print Receipt</button>
+      <button id="newReceiptBtn" class="secondary">New Receipt</button>
+    </div>
   </div>
 </div>
+
+<!-- Printable receipt -->
+<div id="printArea">
+  <div class="receipt-sheet">
+    <div class="r-head">
+      <div class="r-logo">
+        <img src="icons/icon.svg" alt="SFT" />
+        <h2>Shroffs Foundation Trust</h2>
+      </div>
+      <div class="r-reg">
+        <div id="pReg80G"></div>
+        <div id="pTaxNote"></div>
+      </div>
+    </div>
+    <div class="r-title">Donation Receipt</div>
+    <div class="r-noDate">
+      <div>No. <strong id="pReceiptNo"></strong></div>
+      <div>Date: <strong id="pDate"></strong></div>
+    </div>
+
+    <div class="r-line">Received with thanks from <span class="fill" id="pDonor"></span></div>
+    <div class="r-line">the sum of ₹ <span class="fill" id="pAmountWords"></span></div>
+    <div class="r-line">By <span id="pModeLabel"></span> No. <span class="fill" id="pRefNo"></span> Dt. <span class="fill" id="pRefDate"></span></div>
+    <div class="r-line">drawn on <span class="fill" id="pRefBank"></span> At <span class="fill" id="pCity"></span></div>
+    <div class="r-line">for <span class="fill" id="pPurpose"></span></div>
+
+    <div class="r-amountbox"><div class="box">₹ <span id="pAmount"></span></div></div>
+
+    <div class="r-note" id="pChequeNote">Subject to realisation of Cheque / Draft</div>
+
+    <div class="r-sign">
+      <div></div>
+      <div class="for-trust">
+        For Shroffs Foundation Trust<br /><br /><br />
+        Authorised Signatory
+      </div>
+    </div>
+
+    <div class="r-footer">
+      <div id="pTrustReg"></div>
+      <div id="pCommissionerNote"></div>
+      <div id="pAddress"></div>
+      <div id="pContact"></div>
+    </div>
+  </div>
+</div>
+
 <script src="supabase-client.js"></script>
+<script src="trust-info.js"></script>
+<script src="heads.js"></script>
 <script>
-(async () => {
-  const profile = await requireRole(["clerk", "admin"]);
-  if (profile) document.getElementById("whoami").textContent = profile.full_name + " (" + profile.role + ")";
-})();
+let headsIndex = null;
+let lastSavedReceipt = null;
+
+function setRefLabels(mode) {
+  const refFields = document.getElementById("refFields");
+  const refNoLabel = document.getElementById("refNoLabel");
+  const refBankLabel = document.getElementById("refBankLabel");
+  if (mode === "cash") {
+    refFields.classList.add("hidden");
+  } else if (mode === "cheque") {
+    refFields.classList.remove("hidden");
+    refNoLabel.textContent = "Cheque / DD No.";
+    refBankLabel.textContent = "Drawn on (Bank)";
+  } else {
+    refFields.classList.remove("hidden");
+    refNoLabel.textContent = "Transaction / UTR No.";
+    refBankLabel.textContent = "Bank / Gateway";
+  }
+}
+
+document.getElementById("paymentMode").addEventListener("change", (e) => setRefLabels(e.target.value));
+
+document.getElementById("mainHead").addEventListener("change", (e) => {
+  const subWrap = document.getElementById("subHeadWrap");
+  const furtherWrap = document.getElementById("furtherHeadWrap");
+  const subSelect = document.getElementById("subHead");
+  furtherWrap.classList.add("hidden");
+  document.getElementById("furtherHead").innerHTML = "";
+
+  const children = e.target.value ? headsIndex.childrenOf(e.target.value) : [];
+  if (children.length) {
+    populateSelect(subSelect, children, "Select Sub Head");
+    subWrap.classList.remove("hidden");
+  } else {
+    subWrap.classList.add("hidden");
+    subSelect.innerHTML = "";
+  }
+});
+
+document.getElementById("subHead").addEventListener("change", (e) => {
+  const furtherWrap = document.getElementById("furtherHeadWrap");
+  const furtherSelect = document.getElementById("furtherHead");
+  const children = e.target.value ? headsIndex.childrenOf(e.target.value) : [];
+  if (children.length) {
+    populateSelect(furtherSelect, children, "Select Head");
+    furtherWrap.classList.remove("hidden");
+  } else {
+    furtherWrap.classList.add("hidden");
+    furtherSelect.innerHTML = "";
+  }
+});
+
+function amountInWords(num) {
+  // Indian numbering, rupees only (paise ignored for the words line)
+  const a = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+    "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  const b = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+
+  function two(n) {
+    if (n < 20) return a[n];
+    return b[Math.floor(n / 10)] + (n % 10 ? " " + a[n % 10] : "");
+  }
+  function three(n) {
+    if (n >= 100) return a[Math.floor(n / 100)] + " Hundred" + (n % 100 ? " " + two(n % 100) : "");
+    return two(n);
+  }
+
+  let n = Math.floor(num);
+  if (n === 0) return "Zero Rupees Only";
+
+  const crore = Math.floor(n / 10000000); n %= 10000000;
+  const lakh = Math.floor(n / 100000); n %= 100000;
+  const thousand = Math.floor(n / 1000); n %= 1000;
+  const hundred = n;
+
+  let parts = [];
+  if (crore) parts.push(three(crore) + " Crore");
+  if (lakh) parts.push(three(lakh) + " Lakh");
+  if (thousand) parts.push(three(thousand) + " Thousand");
+  if (hundred) parts.push(three(hundred));
+
+  return parts.join(" ") + " Rupees Only";
+}
+
+function purposeLabel(mainId, subId, furtherId) {
+  const parts = [headsIndex.nameOf(mainId)];
+  if (subId) parts.push(headsIndex.nameOf(subId));
+  if (furtherId) parts.push(headsIndex.nameOf(furtherId));
+  return parts.join(" / ");
+}
+
+function showMsg(text, type) {
+  const el = document.getElementById("formMsg");
+  el.textContent = text;
+  el.className = "msg " + type;
+}
+
+document.getElementById("saveBtn").addEventListener("click", async () => {
+  showMsg("", "");
+  const donorName = document.getElementById("donorName").value.trim();
+  const donorPhone = document.getElementById("donorPhone").value.trim();
+  const donorCity = document.getElementById("donorCity").value.trim();
+  const donorAddress = document.getElementById("donorAddress").value.trim();
+  const donorPan = document.getElementById("donorPan").value.trim();
+  const amount = parseFloat(document.getElementById("amount").value);
+  const receiptDate = document.getElementById("receiptDate").value;
+  const paymentMode = document.getElementById("paymentMode").value;
+  const refNo = document.getElementById("refNo").value.trim();
+  const refDate = document.getElementById("refDate").value;
+  const refBank = document.getElementById("refBank").value.trim();
+  const mainHeadId = document.getElementById("mainHead").value;
+  const subHeadId = document.getElementById("subHead").value || null;
+  const furtherHeadId = document.getElementById("furtherHead").value || null;
+
+  if (!donorName) { showMsg("Donor name is required.", "error"); return; }
+  if (!amount || amount <= 0) { showMsg("Enter a valid amount.", "error"); return; }
+  if (!receiptDate) { showMsg("Select a date.", "error"); return; }
+  if (!mainHeadId) { showMsg("Select a Head.", "error"); return; }
+  if (document.getElementById("subHeadWrap").classList.contains("hidden") === false && !subHeadId) {
+    showMsg("Select a Sub Head.", "error"); return;
+  }
+  if (document.getElementById("furtherHeadWrap").classList.contains("hidden") === false && !furtherHeadId) {
+    showMsg("Select a Head under the Sub Head.", "error"); return;
+  }
+
+  document.getElementById("saveBtn").disabled = true;
+
+  const { data, error } = await supabaseClient.rpc("create_receipt", {
+    p_donor_name: donorName,
+    p_donor_address: donorAddress || null,
+    p_donor_city: donorCity || null,
+    p_donor_phone: donorPhone || null,
+    p_donor_pan: donorPan || null,
+    p_amount: amount,
+    p_payment_mode: paymentMode,
+    p_cheque_dd_no: paymentMode === "cash" ? null : (refNo || null),
+    p_cheque_date: paymentMode === "cash" ? null : (refDate || null),
+    p_cheque_bank: paymentMode === "cash" ? null : (refBank || null),
+    p_main_head_id: mainHeadId,
+    p_sub_head_id: subHeadId,
+    p_further_head_id: furtherHeadId
+  });
+
+  document.getElementById("saveBtn").disabled = false;
+
+  if (error) {
+    showMsg(error.message, "error");
+    return;
+  }
+
+  lastSavedReceipt = {
+    ...data,
+    purpose: purposeLabel(mainHeadId, subHeadId, furtherHeadId),
+    mode_label: paymentMode === "cash" ? "Cash" : (paymentMode === "cheque" ? "Cheque/DD" : "Online")
+  };
+
+  document.getElementById("formCard").classList.add("hidden");
+  document.getElementById("successCard").classList.remove("hidden");
+  document.getElementById("savedReceiptNo").textContent = data.receipt_no;
+
+  supabaseClient.functions.invoke("notify-telegram", {
+    body: {
+      receipt_no: data.receipt_no,
+      donor_name: data.donor_name,
+      amount: data.amount,
+      payment_mode: data.payment_mode,
+      purpose: lastSavedReceipt.purpose
+    }
+  }).catch((e) => console.warn("Telegram notify failed (non-blocking):", e));
+});
+
+document.getElementById("newReceiptBtn").addEventListener("click", () => {
+  document.getElementById("successCard").classList.add("hidden");
+  document.getElementById("formCard").classList.remove("hidden");
+  ["donorName","donorPhone","donorCity","donorAddress","donorPan","amount","refNo","refBank"].forEach(id => {
+    document.getElementById(id).value = "";
+  });
+  document.getElementById("refDate").value = "";
+  document.getElementById("paymentMode").value = "cash";
+  setRefLabels("cash");
+  document.getElementById("mainHead").value = "";
+  document.getElementById("subHeadWrap").classList.add("hidden");
+  document.getElementById("furtherHeadWrap").classList.add("hidden");
+  document.getElementById("receiptDate").value = new Date().toISOString().slice(0,10);
+  showMsg("", "");
+});
+
+document.getElementById("printBtn").addEventListener("click", () => {
+  const r = lastSavedReceipt;
+  document.getElementById("pReg80G").textContent = TRUST_INFO.reg80G;
+  document.getElementById("pTaxNote").textContent = TRUST_INFO.taxNote;
+  document.getElementById("pReceiptNo").textContent = r.receipt_no;
+  document.getElementById("pDate").textContent = new Date(r.receipt_date).toLocaleDateString("en-IN");
+  document.getElementById("pDonor").textContent = r.donor_name;
+  document.getElementById("pAmountWords").textContent = amountInWords(r.amount);
+  document.getElementById("pModeLabel").textContent = r.mode_label;
+  document.getElementById("pRefNo").textContent = r.cheque_dd_no || "-";
+  document.getElementById("pRefDate").textContent = r.cheque_date ? new Date(r.cheque_date).toLocaleDateString("en-IN") : "-";
+  document.getElementById("pRefBank").textContent = r.cheque_bank || "-";
+  document.getElementById("pCity").textContent = r.donor_city || "-";
+  document.getElementById("pPurpose").textContent = r.purpose;
+  document.getElementById("pAmount").textContent = Number(r.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 });
+  document.getElementById("pChequeNote").style.display = r.payment_mode === "cash" ? "none" : "block";
+  document.getElementById("pTrustReg").textContent = TRUST_INFO.trustReg + "   " + TRUST_INFO.pan;
+  document.getElementById("pCommissionerNote").textContent = TRUST_INFO.commissionerNote;
+  document.getElementById("pAddress").textContent = TRUST_INFO.address;
+  document.getElementById("pContact").textContent = TRUST_INFO.phone + "   Email: " + TRUST_INFO.email + "   Website: " + TRUST_INFO.website;
+
+  window.print();
+});
+
 document.getElementById("logoutBtn").onclick = async () => {
   await supabaseClient.auth.signOut();
   window.location.href = "./index.html";
 };
+
+(async () => {
+  const profile = await requireRole(["clerk", "admin"]);
+  if (!profile) return;
+  if (profile.role === "admin") document.getElementById("adminLink").classList.remove("hidden");
+
+  document.getElementById("receiptDate").value = new Date().toISOString().slice(0,10);
+  setRefLabels("cash");
+
+  headsIndex = await loadHeads();
+  populateSelect(document.getElementById("mainHead"), headsIndex.mainHeads, "Select Head");
+})();
+
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js");
 </script>
 </body>

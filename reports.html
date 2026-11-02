@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Reports — SFT Donations</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#b91c1c" />
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="styles.css" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brandline"><img src="icons/icon.svg" alt="SFT" /> Shroffs Foundation Trust</div>
+  <nav>
+    <a href="./entry.html">New Receipt</a>
+    <a href="./reports.html">Reports</a>
+    <a id="adminLink" href="./admin.html" class="hidden">Admin</a>
+  </nav>
+  <button id="logoutBtn">Log Out</button>
+</div>
+
+<div class="content">
+  <div class="wide-card">
+    <h2>Donation Reports</h2>
+
+    <div class="row">
+      <div>
+        <label for="dateFrom">From</label>
+        <input id="dateFrom" type="date" />
+      </div>
+      <div>
+        <label for="dateTo">To</label>
+        <input id="dateTo" type="date" />
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label for="groupBy">View</label>
+        <select id="groupBy">
+          <option value="none">All (no grouping)</option>
+          <option value="donor">Donor wise</option>
+          <option value="purpose">Purpose wise (Head)</option>
+          <option value="city">City wise</option>
+          <option value="amount">Amount wise (highest first)</option>
+        </select>
+      </div>
+      <div>
+        <label>Quick range</label>
+        <select id="quickRange">
+          <option value="">—</option>
+          <option value="month">This Month</option>
+          <option value="year">This Year</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="actions-row" style="margin-top:14px;">
+      <button id="runBtn">Run Report</button>
+      <button id="csvBtn" class="secondary">Export CSV</button>
+    </div>
+
+    <div id="reportMsg"></div>
+  </div>
+
+  <div class="wide-card">
+    <div id="reportArea">Run a report to see results.</div>
+  </div>
+</div>
+
+<script src="supabase-client.js"></script>
+<script src="heads.js"></script>
+<script>
+let headsIndex = null;
+let lastRows = [];
+let lastMode = "none";
+
+document.getElementById("quickRange").addEventListener("change", (e) => {
+  const now = new Date();
+  if (e.target.value === "month") {
+    const from = new Date(now.getFullYear(), now.getMonth(), 1);
+    document.getElementById("dateFrom").value = from.toISOString().slice(0,10);
+    document.getElementById("dateTo").value = now.toISOString().slice(0,10);
+  } else if (e.target.value === "year") {
+    const from = new Date(now.getFullYear(), 0, 1);
+    document.getElementById("dateFrom").value = from.toISOString().slice(0,10);
+    document.getElementById("dateTo").value = now.toISOString().slice(0,10);
+  }
+});
+
+function purposeOf(row) {
+  const parts = [headsIndex.nameOf(row.main_head_id)];
+  if (row.sub_head_id) parts.push(headsIndex.nameOf(row.sub_head_id));
+  if (row.further_head_id) parts.push(headsIndex.nameOf(row.further_head_id));
+  return parts.join(" / ");
+}
+
+function fmtAmt(n) {
+  return Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2 });
+}
+
+function renderFlat(rows) {
+  let html = `<table class="report-table"><thead><tr>
+    <th>Receipt No</th><th>Date</th><th>Donor</th><th>City</th><th>Head</th><th>Mode</th><th>Amount</th>
+  </tr></thead><tbody>`;
+  let total = 0;
+  rows.forEach((r) => {
+    total += Number(r.amount);
+    html += `<tr>
+      <td>${r.receipt_no}</td>
+      <td>${new Date(r.receipt_date).toLocaleDateString("en-IN")}</td>
+      <td>${r.donor_name}</td>
+      <td>${r.donor_city || "-"}</td>
+      <td>${purposeOf(r)}</td>
+      <td>${r.payment_mode}</td>
+      <td>${fmtAmt(r.amount)}</td>
+    </tr>`;
+  });
+  html += `</tbody><tfoot><tr><td colspan="6">Total</td><td>${fmtAmt(total)}</td></tr></tfoot></table>`;
+  return html;
+}
+
+function renderGrouped(rows, keyFn, label) {
+  const groups = {};
+  rows.forEach((r) => {
+    const key = keyFn(r) || "(not specified)";
+    if (!groups[key]) groups[key] = { count: 0, total: 0 };
+    groups[key].count += 1;
+    groups[key].total += Number(r.amount);
+  });
+  const entries = Object.entries(groups).sort((a, b) => b[1].total - a[1].total);
+  let html = `<table class="report-table"><thead><tr><th>${label}</th><th>Receipts</th><th>Total Amount</th></tr></thead><tbody>`;
+  let grandTotal = 0;
+  entries.forEach(([key, g]) => {
+    grandTotal += g.total;
+    html += `<tr><td>${key}</td><td>${g.count}</td><td>${fmtAmt(g.total)}</td></tr>`;
+  });
+  html += `</tbody><tfoot><tr><td colspan="2">Total</td><td>${fmtAmt(grandTotal)}</td></tr></tfoot></table>`;
+  return html;
+}
+
+document.getElementById("runBtn").addEventListener("click", async () => {
+  const msg = document.getElementById("reportMsg");
+  msg.textContent = ""; msg.className = "";
+
+  const from = document.getElementById("dateFrom").value;
+  const to = document.getElementById("dateTo").value;
+  const mode = document.getElementById("groupBy").value;
+
+  let query = supabaseClient.from("receipts").select("*");
+  if (from) query = query.gte("receipt_date", from);
+  if (to) query = query.lte("receipt_date", to);
+  query = query.order("receipt_date", { ascending: mode !== "amount" });
+  if (mode === "amount") query = query.order("amount", { ascending: false });
+
+  const { data, error } = await query;
+  if (error) { msg.textContent = error.message; msg.className = "msg error"; return; }
+
+  lastRows = data;
+  lastMode = mode;
+
+  const area = document.getElementById("reportArea");
+  if (!data.length) { area.innerHTML = "No receipts in this range."; return; }
+
+  if (mode === "donor") area.innerHTML = renderGrouped(data, (r) => r.donor_name, "Donor");
+  else if (mode === "purpose") area.innerHTML = renderGrouped(data, (r) => purposeOf(r), "Purpose");
+  else if (mode === "city") area.innerHTML = renderGrouped(data, (r) => r.donor_city, "City");
+  else area.innerHTML = renderFlat(data);
+});
+
+document.getElementById("csvBtn").addEventListener("click", () => {
+  if (!lastRows.length) { alert("Run a report first."); return; }
+  let csv = "Receipt No,Date,Donor,Phone,City,Address,PAN,Head,Mode,Amount\n";
+  lastRows.forEach((r) => {
+    const fields = [r.receipt_no, r.receipt_date, r.donor_name, r.donor_phone || "", r.donor_city || "",
+      r.donor_address || "", r.donor_pan || "", purposeOf(r), r.payment_mode, r.amount];
+    csv += fields.map((f) => `"${String(f).replace(/"/g, '""')}"`).join(",") + "\n";
+  });
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "sft-donations-report.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById("logoutBtn").onclick = async () => {
+  await supabaseClient.auth.signOut();
+  window.location.href = "./index.html";
+};
+
+(async () => {
+  const profile = await requireRole(["clerk", "admin"]);
+  if (!profile) return;
+  if (profile.role === "admin") document.getElementById("adminLink").classList.remove("hidden");
+  headsIndex = await loadHeads();
+})();
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js");
+</script>
+</body>
+</html>

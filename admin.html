@@ -11,27 +11,131 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
 <body>
-<div class="page">
-  <div class="card">
-    <div class="brand">
-      <img src="icons/icon.svg" alt="SFT" />
-      <h1>Shroffs Foundation Trust</h1>
-      <p id="whoami">Admin</p>
-    </div>
-    <p>Admin dashboard (approvals, reports, receipt-number setting) is coming next.</p>
-    <button id="logoutBtn" class="secondary">Log Out</button>
-  </div>
+
+<div class="topbar">
+  <div class="brandline"><img src="icons/icon.svg" alt="SFT" /> Shroffs Foundation Trust</div>
+  <nav>
+    <a href="./entry.html">New Receipt</a>
+    <a href="./reports.html">Reports</a>
+    <a href="./admin.html">Admin</a>
+  </nav>
+  <button id="logoutBtn">Log Out</button>
 </div>
+
+<div class="content">
+
+  <div class="wide-card">
+    <h2>Pending Approvals</h2>
+    <div id="pendingList">Loading…</div>
+  </div>
+
+  <div class="wide-card">
+    <h2>All Users</h2>
+    <table class="report-table" id="usersTable">
+      <thead><tr><th>Name</th><th>Email</th><th>Role</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="wide-card">
+    <h2>Receipt Numbering</h2>
+    <p class="field-note">Set this once before go-live, to whatever number comes after the last paper-book receipt in use at that time.</p>
+    <label for="nextReceiptNo">Next Receipt No.</label>
+    <input id="nextReceiptNo" type="number" min="1" />
+    <button id="saveReceiptNoBtn">Save</button>
+    <div id="settingsMsg"></div>
+  </div>
+
+</div>
+
 <script src="supabase-client.js"></script>
 <script>
-(async () => {
-  const profile = await requireRole(["admin"]);
-  if (profile) document.getElementById("whoami").textContent = profile.full_name + " (admin)";
-})();
+async function loadPending() {
+  const { data, error } = await supabaseClient
+    .from("profiles")
+    .select("id, full_name, email, role")
+    .is("role", null)
+    .order("created_at");
+
+  const el = document.getElementById("pendingList");
+  if (error) { el.textContent = error.message; return; }
+  if (!data.length) { el.textContent = "No pending accounts."; return; }
+
+  el.innerHTML = "";
+  data.forEach((u) => {
+    const row = document.createElement("div");
+    row.style.display = "flex";
+    row.style.justifyContent = "space-between";
+    row.style.alignItems = "center";
+    row.style.padding = "10px 0";
+    row.style.borderBottom = "1px solid #eee2d8";
+    row.innerHTML = `
+      <div><strong>${u.full_name || "(no name)"}</strong><br /><span class="field-note">${u.email || ""}</span></div>
+      <div class="actions-row">
+        <button data-id="${u.id}" data-role="clerk" class="approveBtn">Approve as Clerk</button>
+        <button data-id="${u.id}" data-role="admin" class="approveBtn secondary">Approve as Admin</button>
+      </div>
+    `;
+    el.appendChild(row);
+  });
+
+  document.querySelectorAll(".approveBtn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      const { error } = await supabaseClient.rpc("admin_set_user_role", {
+        p_user_id: btn.dataset.id,
+        p_role: btn.dataset.role
+      });
+      if (error) { alert(error.message); btn.disabled = false; return; }
+      await loadPending();
+      await loadUsers();
+    });
+  });
+}
+
+async function loadUsers() {
+  const { data, error } = await supabaseClient
+    .from("profiles")
+    .select("full_name, email, role")
+    .order("created_at");
+  const tbody = document.querySelector("#usersTable tbody");
+  tbody.innerHTML = "";
+  if (error) return;
+  data.forEach((u) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${u.full_name || "-"}</td><td>${u.email || "-"}</td><td>${u.role || "pending"}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+async function loadSettings() {
+  const { data, error } = await supabaseClient.rpc("admin_get_next_receipt_no");
+  if (!error) document.getElementById("nextReceiptNo").value = data;
+}
+
+document.getElementById("saveReceiptNoBtn").addEventListener("click", async () => {
+  const msg = document.getElementById("settingsMsg");
+  const val = parseInt(document.getElementById("nextReceiptNo").value, 10);
+  if (!val || val < 1) { msg.textContent = "Enter a valid number."; msg.className = "msg error"; return; }
+  const { error } = await supabaseClient.rpc("admin_set_next_receipt_no", { p_value: val });
+  if (error) { msg.textContent = error.message; msg.className = "msg error"; return; }
+  msg.textContent = "Saved.";
+  msg.className = "msg info";
+});
+
 document.getElementById("logoutBtn").onclick = async () => {
   await supabaseClient.auth.signOut();
   window.location.href = "./index.html";
 };
+
+(async () => {
+  const profile = await requireRole(["admin"]);
+  if (!profile) return;
+  await loadPending();
+  await loadUsers();
+  await loadSettings();
+})();
+
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js");
 </script>
 </body>
