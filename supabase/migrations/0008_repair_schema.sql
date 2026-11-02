@@ -2,6 +2,12 @@
 -- regardless of which earlier migrations fully applied. Safe to run any
 -- number of times.
 
+-- Postgres treats an added parameter as a NEW overload, not a replacement
+-- of the old one, even with CREATE OR REPLACE — so earlier migrations left
+-- 3 versions of create_receipt stacked up. Drop the obsolete ones first.
+drop function if exists create_receipt(text, text, text, text, text, numeric, text, text, date, text, uuid, uuid, uuid);
+drop function if exists create_receipt(text, text, text, text, text, numeric, text, text, date, text, uuid, uuid, uuid, text);
+
 alter table receipts alter column amount drop not null;
 alter table receipts add column if not exists item_description text;
 alter table receipts add column if not exists donor_email text;
