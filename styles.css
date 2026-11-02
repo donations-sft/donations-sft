@@ -138,6 +138,9 @@ button.secondary:hover { background: #fdf1f1; }
   font-weight: 600;
 }
 
+.topbar .brandline .brand-text { display: flex; flex-direction: column; line-height: 1.2; }
+.topbar .brandline .brand-tagline { font-size: 0.68rem; font-weight: 400; opacity: 0.85; }
+
 .topbar img { width: 28px; height: 28px; }
 
 .topbar nav { display: flex; gap: 14px; flex-wrap: wrap; }
@@ -257,7 +260,7 @@ table.report-table tfoot td {
   margin-bottom: 12px;
 }
 .receipt-sheet .r-head .r-logo { display: flex; gap: 10px; align-items: center; }
-.receipt-sheet .r-head .r-logo img { width: 42px; height: 42px; }
+.receipt-sheet .r-head .r-logo img.r-logo-full { width: auto; height: 60px; }
 .receipt-sheet .r-head h2 { margin: 0; font-size: 1.2rem; color: #b91c1c; }
 .receipt-sheet .r-head .r-reg { text-align: right; font-size: 0.72rem; color: #444; max-width: 320px; }
 .receipt-sheet .r-head .r-reg .r-reg-number { white-space: nowrap; font-weight: 600; }
