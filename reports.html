@@ -108,7 +108,8 @@ function renderFlat(rows) {
   </tr></thead><tbody>`;
   let total = 0;
   rows.forEach((r) => {
-    total += Number(r.amount);
+    total += Number(r.amount) || 0;
+    const amountCell = r.payment_mode === "inkind" ? (r.item_description || "-") : fmtAmt(r.amount);
     html += `<tr>
       <td>${r.receipt_no}</td>
       <td>${new Date(r.receipt_date).toLocaleDateString("en-IN")}</td>
@@ -116,10 +117,10 @@ function renderFlat(rows) {
       <td>${r.donor_city || "-"}</td>
       <td>${purposeOf(r)}</td>
       <td>${r.payment_mode}</td>
-      <td>${fmtAmt(r.amount)}</td>
+      <td>${amountCell}</td>
     </tr>`;
   });
-  html += `</tbody><tfoot><tr><td colspan="6">Total</td><td>${fmtAmt(total)}</td></tr></tfoot></table>`;
+  html += `</tbody><tfoot><tr><td colspan="6">Total (excl. Inkind)</td><td>${fmtAmt(total)}</td></tr></tfoot></table>`;
   return html;
 }
 
@@ -129,7 +130,7 @@ function renderGrouped(rows, keyFn, label) {
     const key = keyFn(r) || "(not specified)";
     if (!groups[key]) groups[key] = { count: 0, total: 0 };
     groups[key].count += 1;
-    groups[key].total += Number(r.amount);
+    groups[key].total += Number(r.amount) || 0;
   });
   const entries = Object.entries(groups).sort((a, b) => b[1].total - a[1].total);
   let html = `<table class="report-table"><thead><tr><th>${label}</th><th>Receipts</th><th>Total Amount</th></tr></thead><tbody>`;
@@ -154,7 +155,7 @@ document.getElementById("runBtn").addEventListener("click", async () => {
   if (from) query = query.gte("receipt_date", from);
   if (to) query = query.lte("receipt_date", to);
   query = query.order("receipt_date", { ascending: mode !== "amount" });
-  if (mode === "amount") query = query.order("amount", { ascending: false });
+  if (mode === "amount") query = query.order("amount", { ascending: false, nullsFirst: false });
 
   const { data, error } = await query;
   if (error) { msg.textContent = error.message; msg.className = "msg error"; return; }
@@ -173,10 +174,10 @@ document.getElementById("runBtn").addEventListener("click", async () => {
 
 document.getElementById("csvBtn").addEventListener("click", () => {
   if (!lastRows.length) { alert("Run a report first."); return; }
-  let csv = "Receipt No,Date,Donor,Phone,City,Address,PAN,Head,Mode,Amount\n";
+  let csv = "Receipt No,Date,Donor,Phone,City,Address,PAN,Head,Mode,Amount,Item Description\n";
   lastRows.forEach((r) => {
     const fields = [r.receipt_no, r.receipt_date, r.donor_name, r.donor_phone || "", r.donor_city || "",
-      r.donor_address || "", r.donor_pan || "", purposeOf(r), r.payment_mode, r.amount];
+      r.donor_address || "", r.donor_pan || "", purposeOf(r), r.payment_mode, r.amount || "", r.item_description || ""];
     csv += fields.map((f) => `"${String(f).replace(/"/g, '""')}"`).join(",") + "\n";
   });
   const blob = new Blob([csv], { type: "text/csv" });

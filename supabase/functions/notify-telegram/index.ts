@@ -9,7 +9,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { receipt_no, donor_name, amount, payment_mode, purpose } = await req.json();
+    const { receipt_no, donor_name, amount, item_description, payment_mode, purpose } = await req.json();
 
     const botToken = Deno.env.get("TELEGRAM_BOT_TOKEN");
     const chatId = Deno.env.get("TELEGRAM_CHAT_ID");
@@ -18,11 +18,15 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Telegram not configured" }), { status: 500 });
     }
 
+    const amountLine = payment_mode === "inkind"
+      ? `Item(s): ${item_description}`
+      : `Amount: Rs. ${amount}`;
+
     const text =
       `New Donation Receipt\n` +
       `No: ${receipt_no}\n` +
       `Donor: ${donor_name}\n` +
-      `Amount: Rs. ${amount}\n` +
+      `${amountLine}\n` +
       `Mode: ${payment_mode}\n` +
       `Head: ${purpose}`;
 
