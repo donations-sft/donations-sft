@@ -433,8 +433,12 @@ document.getElementById("doPrintBtn").addEventListener("click", () => {
 });
 
 document.getElementById("whatsappBtn").addEventListener("click", async () => {
-  shareMsg("Preparing…");
   const r = currentReceipt;
+  if (!formatWhatsAppNumber(r.donor_phone)) {
+    alert("No WhatsApp number entered. Please add one and try again.");
+    return;
+  }
+  shareMsg("Preparing…");
   const canvas = lastReceiptCanvas || await captureReceiptImage();
   const text = `Donation Receipt No. ${r.receipt_no} from Shroffs Foundation Trust. Thank you!`;
 
