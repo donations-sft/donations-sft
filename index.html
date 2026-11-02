@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Shroffs Foundation Trust — Donations</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#b91c1c" />
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="styles.css" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+</head>
+<body>
+<div class="page">
+  <div class="card">
+    <div class="brand">
+      <img src="icons/icon.svg" alt="SFT" />
+      <h1>Shroffs Foundation Trust</h1>
+      <p>Donation Receipts</p>
+    </div>
+
+    <div id="loginForm">
+      <label for="loginEmail">Email</label>
+      <input id="loginEmail" type="email" autocomplete="username" />
+
+      <label for="loginPassword">Password</label>
+      <input id="loginPassword" type="password" autocomplete="current-password" />
+
+      <button id="loginBtn">Log In</button>
+
+      <div class="link-row">New clerk? <a id="showSignup">Create an account</a></div>
+    </div>
+
+    <div id="signupForm" class="hidden">
+      <label for="signupName">Full Name</label>
+      <input id="signupName" type="text" autocomplete="name" />
+
+      <label for="signupEmail">Email</label>
+      <input id="signupEmail" type="email" autocomplete="username" />
+
+      <label for="signupPassword">Password</label>
+      <input id="signupPassword" type="password" autocomplete="new-password" />
+
+      <button id="signupBtn">Create Account</button>
+
+      <div class="link-row">Already have an account? <a id="showLogin">Log in</a></div>
+    </div>
+
+    <div id="pendingPanel" class="hidden">
+      <p>Your account is created but not yet approved by the admin. Please check back later, or contact the trust office.</p>
+      <button id="logoutBtn" class="secondary">Log Out</button>
+    </div>
+
+    <div id="msg"></div>
+  </div>
+</div>
+
+<script src="supabase-client.js"></script>
+<script>
+const loginForm = document.getElementById("loginForm");
+const signupForm = document.getElementById("signupForm");
+const pendingPanel = document.getElementById("pendingPanel");
+const msg = document.getElementById("msg");
+
+function showMsg(text, type) {
+  msg.textContent = text;
+  msg.className = "msg " + type;
+}
+function clearMsg() {
+  msg.textContent = "";
+  msg.className = "";
+}
+
+document.getElementById("showSignup").onclick = () => {
+  loginForm.classList.add("hidden");
+  signupForm.classList.remove("hidden");
+  clearMsg();
+};
+document.getElementById("showLogin").onclick = () => {
+  signupForm.classList.add("hidden");
+  loginForm.classList.remove("hidden");
+  clearMsg();
+};
+
+document.getElementById("loginBtn").onclick = async () => {
+  clearMsg();
+  const email = document.getElementById("loginEmail").value.trim();
+  const password = document.getElementById("loginPassword").value;
+  if (!email || !password) { showMsg("Enter email and password.", "error"); return; }
+
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  if (error) { showMsg(error.message, "error"); return; }
+  await routeAfterLogin();
+};
+
+document.getElementById("signupBtn").onclick = async () => {
+  clearMsg();
+  const full_name = document.getElementById("signupName").value.trim();
+  const email = document.getElementById("signupEmail").value.trim();
+  const password = document.getElementById("signupPassword").value;
+  if (!full_name || !email || !password) { showMsg("Fill all fields.", "error"); return; }
+
+  const { data, error } = await supabaseClient.auth.signUp({
+    email, password, options: { data: { full_name } }
+  });
+
+  if (error) {
+    if (error.message.toLowerCase().includes("already") || error.message.toLowerCase().includes("registered")) {
+      showMsg("This email is already registered. Try logging in instead.", "error");
+    } else {
+      showMsg(error.message, "error");
+    }
+    return;
+  }
+
+  if (data.session) {
+    await routeAfterLogin();
+  } else {
+    showMsg("Account created. Waiting for admin approval before you can log in.", "info");
+  }
+};
+
+document.getElementById("logoutBtn").onclick = async () => {
+  await supabaseClient.auth.signOut();
+  pendingPanel.classList.add("hidden");
+  loginForm.classList.remove("hidden");
+};
+
+async function routeAfterLogin() {
+  const profile = await getMyProfile();
+  if (!profile || !profile.role) {
+    loginForm.classList.add("hidden");
+    signupForm.classList.add("hidden");
+    pendingPanel.classList.remove("hidden");
+    return;
+  }
+  if (profile.role === "admin") {
+    window.location.href = "./admin.html";
+  } else {
+    window.location.href = "./entry.html";
+  }
+}
+
+(async () => {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (session) await routeAfterLogin();
+})();
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("./service-worker.js");
+}
+</script>
+</body>
+</html>

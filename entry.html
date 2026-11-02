@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>New Receipt — SFT Donations</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#b91c1c" />
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="styles.css" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+</head>
+<body>
+<div class="page">
+  <div class="card">
+    <div class="brand">
+      <img src="icons/icon.svg" alt="SFT" />
+      <h1>Shroffs Foundation Trust</h1>
+      <p id="whoami">Receipt Entry</p>
+    </div>
+    <p>Receipt entry form is coming next.</p>
+    <button id="logoutBtn" class="secondary">Log Out</button>
+  </div>
+</div>
+<script src="supabase-client.js"></script>
+<script>
+(async () => {
+  const profile = await requireRole(["clerk", "admin"]);
+  if (profile) document.getElementById("whoami").textContent = profile.full_name + " (" + profile.role + ")";
+})();
+document.getElementById("logoutBtn").onclick = async () => {
+  await supabaseClient.auth.signOut();
+  window.location.href = "./index.html";
+};
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js");
+</script>
+</body>
+</html>
