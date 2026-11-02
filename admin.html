@@ -25,6 +25,16 @@
 <div class="content">
 
   <div class="wide-card">
+    <h2>Live Totals</h2>
+    <table class="report-table" id="liveTable">
+      <thead><tr><th>Head</th><th>Today</th><th>Cumulative</th></tr></thead>
+      <tbody></tbody>
+      <tfoot><tr><td>Grand Total</td><td id="liveTodayTotal">0</td><td id="liveCumTotal">0</td></tr></tfoot>
+    </table>
+    <p class="field-note">Updates automatically when a new receipt is saved.</p>
+  </div>
+
+  <div class="wide-card">
     <h2>Pending Approvals</h2>
     <div id="pendingList">Loading…</div>
   </div>
@@ -50,6 +60,28 @@
 
 <script src="supabase-client.js"></script>
 <script>
+function fmtAmt(n) {
+  return Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2 });
+}
+
+async function loadLiveTotals() {
+  const { data, error } = await supabaseClient.rpc("get_live_totals");
+  if (error) { console.warn("live totals:", error.message); return; }
+
+  const tbody = document.querySelector("#liveTable tbody");
+  tbody.innerHTML = "";
+  let todayTotal = 0, cumTotal = 0;
+  data.forEach((row) => {
+    todayTotal += Number(row.today_total);
+    cumTotal += Number(row.cumulative_total);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${row.head_name}</td><td>${fmtAmt(row.today_total)}</td><td>${fmtAmt(row.cumulative_total)}</td>`;
+    tbody.appendChild(tr);
+  });
+  document.getElementById("liveTodayTotal").textContent = fmtAmt(todayTotal);
+  document.getElementById("liveCumTotal").textContent = fmtAmt(cumTotal);
+}
+
 async function loadPending() {
   const { data, error } = await supabaseClient
     .from("profiles")
@@ -131,9 +163,17 @@ document.getElementById("logoutBtn").onclick = async () => {
 (async () => {
   const profile = await requireRole(["admin"]);
   if (!profile) return;
+  await loadLiveTotals();
   await loadPending();
   await loadUsers();
   await loadSettings();
+
+  supabaseClient
+    .channel("receipts-live")
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "receipts" }, () => {
+      loadLiveTotals();
+    })
+    .subscribe();
 })();
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js");
