@@ -4,9 +4,22 @@
 
 -- Postgres treats an added parameter as a NEW overload, not a replacement
 -- of the old one, even with CREATE OR REPLACE — so earlier migrations left
--- 3 versions of create_receipt stacked up. Drop the obsolete ones first.
-drop function if exists create_receipt(text, text, text, text, text, numeric, text, text, date, text, uuid, uuid, uuid);
-drop function if exists create_receipt(text, text, text, text, text, numeric, text, text, date, text, uuid, uuid, uuid, text);
+-- multiple versions of create_receipt stacked up. Drop ALL of them
+-- dynamically (whatever their actual signatures turn out to be) before
+-- recreating the one correct version below.
+do $$
+declare
+  r record;
+begin
+  for r in
+    select p.oid::regprocedure as sig
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'create_receipt'
+  loop
+    execute format('drop function %s', r.sig);
+  end loop;
+end $$;
 
 alter table receipts alter column amount drop not null;
 alter table receipts add column if not exists item_description text;
