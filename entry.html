@@ -431,9 +431,17 @@ function populatePrintArea(r) {
   }
 }
 
+function lockReceipt() {
+  if (!lastSavedReceipt || lastSavedReceipt.printed) return;
+  lastSavedReceipt.printed = true;
+  supabaseClient.rpc("mark_printed", { p_receipt_id: lastSavedReceipt.id })
+    .catch((e) => console.warn("mark_printed failed (non-blocking):", e));
+}
+
 document.getElementById("printBtn").addEventListener("click", () => {
   populatePrintArea(lastSavedReceipt);
   window.print();
+  lockReceipt();
 });
 
 function shareMsg(text) {
@@ -484,6 +492,8 @@ document.getElementById("whatsappBtn").addEventListener("click", async () => {
     alert("Receipt image downloaded. Attach it manually in WhatsApp before sending — WhatsApp doesn't accept images via this link directly.");
     shareMsg("");
   }, "image/png");
+
+  lockReceipt();
 });
 
 document.getElementById("emailBtn").addEventListener("click", () => {
@@ -494,6 +504,7 @@ document.getElementById("emailBtn").addEventListener("click", () => {
   window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   if (!to) shareMsg("No email on file for this donor — fill it in manually in your mail app.");
   else shareMsg("");
+  lockReceipt();
 });
 
 document.getElementById("logoutBtn").onclick = async () => {

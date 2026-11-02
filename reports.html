@@ -104,12 +104,13 @@ function fmtAmt(n) {
 
 function renderFlat(rows) {
   let html = `<table class="report-table"><thead><tr>
-    <th>Receipt No</th><th>Date</th><th>Donor</th><th>City</th><th>Head</th><th>Mode</th><th>Amount</th>
+    <th>Receipt No</th><th>Date</th><th>Donor</th><th>City</th><th>Head</th><th>Mode</th><th>Amount</th><th></th>
   </tr></thead><tbody>`;
   let total = 0;
   rows.forEach((r) => {
     total += Number(r.amount) || 0;
     const amountCell = r.payment_mode === "inkind" ? (r.item_description || "-") : fmtAmt(r.amount);
+    const lockNote = r.printed ? ' <span class="pill">printed</span>' : "";
     html += `<tr>
       <td>${r.receipt_no}</td>
       <td>${new Date(r.receipt_date).toLocaleDateString("en-IN")}</td>
@@ -118,9 +119,10 @@ function renderFlat(rows) {
       <td>${purposeOf(r)}</td>
       <td>${r.payment_mode}</td>
       <td>${amountCell}</td>
+      <td><a href="./receipt-edit.html?id=${r.id}">Edit${lockNote}</a></td>
     </tr>`;
   });
-  html += `</tbody><tfoot><tr><td colspan="6">Total (excl. Inkind)</td><td>${fmtAmt(total)}</td></tr></tfoot></table>`;
+  html += `</tbody><tfoot><tr><td colspan="6">Total (excl. Inkind)</td><td>${fmtAmt(total)}</td><td></td></tr></tfoot></table>`;
   return html;
 }
 
