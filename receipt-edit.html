@@ -434,39 +434,26 @@ document.getElementById("doPrintBtn").addEventListener("click", () => {
 
 document.getElementById("whatsappBtn").addEventListener("click", async () => {
   const r = currentReceipt;
-  if (!formatWhatsAppNumber(r.donor_phone)) {
+  const target = formatWhatsAppNumber(r.donor_phone);
+  if (!target) {
     alert("No WhatsApp number entered. Please add one and try again.");
     return;
   }
-  shareMsg("Preparing…");
-  const canvas = lastReceiptCanvas || await captureReceiptImage();
+
   const text = `Donation Receipt No. ${r.receipt_no} from Shroffs Foundation Trust. Thank you!`;
+  // Fire this immediately, synchronously, while the tap is still "fresh" —
+  // any await before this makes mobile browsers refuse to hand off to the app.
+  window.location.href = `whatsapp://send?phone=${target}&text=${encodeURIComponent(text)}`;
 
-  canvas.toBlob(async (blob) => {
-    const file = new File([blob], `receipt-${r.receipt_no}.png`, { type: "image/png" });
-
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({ files: [file], text });
-        shareMsg("Shared.");
-        return;
-      } catch (e) {
-        // user cancelled or share failed — fall through to download+wa.me
-      }
-    }
-
+  shareMsg("Also downloading the receipt image — attach it in the WhatsApp chat.");
+  const canvas = lastReceiptCanvas || await captureReceiptImage();
+  canvas.toBlob((blob) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `receipt-${r.receipt_no}.png`;
     a.click();
     URL.revokeObjectURL(url);
-
-    const target = formatWhatsAppNumber(r.donor_phone);
-    const waUrl = `whatsapp://send?phone=${target}&text=${encodeURIComponent(text)}`;
-    alert("Receipt image downloaded. Attach it manually in WhatsApp before sending — WhatsApp doesn't accept images via this link directly.");
-    window.location.href = waUrl;
-    shareMsg("");
   }, "image/png");
 
   lockReceipt();
