@@ -34,6 +34,7 @@ body {
 }
 
 .brand img { width: 56px; height: 56px; }
+.brand img.brand-logo-full { width: 120px; height: auto; }
 
 .brand h1 {
   font-size: 1.1rem;
@@ -258,11 +259,12 @@ table.report-table tfoot td {
 .receipt-sheet .r-head .r-logo { display: flex; gap: 10px; align-items: center; }
 .receipt-sheet .r-head .r-logo img { width: 42px; height: 42px; }
 .receipt-sheet .r-head h2 { margin: 0; font-size: 1.2rem; color: #b91c1c; }
-.receipt-sheet .r-head .r-reg { text-align: right; font-size: 0.72rem; color: #444; max-width: 260px; }
-.receipt-sheet .r-title { text-align: center; font-size: 1rem; font-weight: bold; margin: 6px 0 14px; letter-spacing: 1px; }
+.receipt-sheet .r-head .r-reg { text-align: right; font-size: 0.72rem; color: #444; max-width: 320px; }
+.receipt-sheet .r-head .r-reg .r-reg-number { white-space: nowrap; font-weight: 600; }
+.receipt-sheet .r-title { text-align: center; font-size: 1rem; font-weight: bold; margin: 18px 0 14px; letter-spacing: 1px; }
 .receipt-sheet .r-noDate { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 10px; }
-.receipt-sheet .r-line { margin: 10px 0; font-size: 0.92rem; }
-.receipt-sheet .r-line .fill { border-bottom: 1px dotted #999; padding: 0 4px; }
+.receipt-sheet .r-line { margin: 14px 0; font-size: 0.92rem; }
+.receipt-sheet .r-line .fill { display: inline-block; min-width: 260px; border-bottom: 1px solid #333; padding: 0 4px 2px; }
 .receipt-sheet .r-amountbox { display: flex; justify-content: flex-end; margin: 10px 0; }
 .receipt-sheet .r-amountbox .box { border: 1px solid #333; padding: 6px 16px; font-weight: bold; }
 .receipt-sheet .r-note { font-size: 0.78rem; font-style: italic; margin-top: 8px; }

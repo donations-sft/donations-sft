@@ -6,14 +6,14 @@
 <title>Edit Receipt — SFT Donations</title>
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#b91c1c" />
-<link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+<link rel="icon" href="icons/icon-192.png" type="image/png" />
 <link rel="stylesheet" href="styles.css" />
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
 <body>
 
 <div class="topbar">
-  <div class="brandline"><img src="icons/icon.svg" alt="SFT" /> Shroffs Foundation Trust</div>
+  <div class="brandline"><img src="icons/icon-192.png" alt="SFT" /> Shroffs Foundation Trust</div>
   <nav>
     <a href="./entry.html">New Receipt</a>
     <a href="./reports.html">Reports</a>
@@ -125,11 +125,11 @@
   <div class="receipt-sheet">
     <div class="r-head">
       <div class="r-logo">
-        <img src="icons/icon.svg" alt="SFT" />
+        <img src="icons/icon-192.png" alt="SFT" />
         <h2>Shroffs Foundation Trust</h2>
       </div>
       <div class="r-reg">
-        <div id="pReg80G"></div>
+        <div id="pReg80G" class="r-reg-number"></div>
         <div id="pTaxNote"></div>
       </div>
     </div>
@@ -142,7 +142,8 @@
     <div class="r-line">Received with thanks from <span class="fill" id="pDonor"></span></div>
     <div class="r-line" id="pAmountLine">the sum of ₹ <span class="fill" id="pAmountWords"></span></div>
     <div class="r-line" id="pItemLine">the following item(s): <span class="fill" id="pItemDesc"></span></div>
-    <div class="r-line" id="pModeLine">By <span id="pModeLabel"></span> No. <span class="fill" id="pRefNo"></span> Dt. <span class="fill" id="pRefDate"></span></div>
+    <div class="r-line" id="pChequeLine">By Cheque No. <span class="fill" id="pChqNo"></span> Dt. <span class="fill" id="pChqDate"></span></div>
+    <div class="r-line" id="pOnlineLine">By Online, Txn ID <span class="fill" id="pTxnId"></span> Dt. <span class="fill" id="pTxnDate"></span></div>
     <div class="r-line" id="pBankLine">drawn on <span class="fill" id="pRefBank"></span> At <span class="fill" id="pCity"></span></div>
     <div class="r-line" id="pCityOnlyLine">At <span class="fill" id="pCity2"></span></div>
     <div class="r-line">for <span class="fill" id="pPurpose"></span></div>
@@ -330,27 +331,41 @@ function populatePrintArea(r) {
   document.getElementById("pAddress").textContent = TRUST_INFO.address;
   document.getElementById("pContact").textContent = TRUST_INFO.phone + "   Email: " + TRUST_INFO.email + "   Website: " + TRUST_INFO.website;
 
+  const cash = r.payment_mode === "cash";
+  const cheque = r.payment_mode === "cheque";
+  const online = r.payment_mode === "online";
+
   document.getElementById("pAmountLine").style.display = inkind ? "none" : "block";
-  document.getElementById("pModeLine").style.display = inkind ? "none" : "block";
-  document.getElementById("pBankLine").style.display = inkind ? "none" : "block";
-  document.getElementById("pAmountBox").style.display = inkind ? "none" : "flex";
   document.getElementById("pItemLine").style.display = inkind ? "block" : "none";
-  document.getElementById("pCityOnlyLine").style.display = inkind ? "block" : "none";
+  document.getElementById("pAmountBox").style.display = inkind ? "none" : "flex";
+
+  document.getElementById("pChequeLine").style.display = cheque ? "block" : "none";
+  document.getElementById("pOnlineLine").style.display = online ? "block" : "none";
+  document.getElementById("pBankLine").style.display = cheque ? "block" : "none";
+  document.getElementById("pCityOnlyLine").style.display = (cash || online || inkind) ? "block" : "none";
 
   if (inkind) {
     document.getElementById("pItemDesc").textContent = r.item_description;
     document.getElementById("pCity2").textContent = r.donor_city || "-";
     document.getElementById("pChequeNote").style.display = "none";
   } else {
-    const modeLabel = r.payment_mode === "cash" ? "Cash" : (r.payment_mode === "cheque" ? "Cheque/DD" : "Online");
     document.getElementById("pAmountWords").textContent = amountInWords(r.amount);
-    document.getElementById("pModeLabel").textContent = modeLabel;
-    document.getElementById("pRefNo").textContent = r.cheque_dd_no || "-";
-    document.getElementById("pRefDate").textContent = r.cheque_date ? new Date(r.cheque_date).toLocaleDateString("en-IN") : "-";
-    document.getElementById("pRefBank").textContent = r.cheque_bank || "-";
-    document.getElementById("pCity").textContent = r.donor_city || "-";
     document.getElementById("pAmount").textContent = Number(r.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 });
-    document.getElementById("pChequeNote").style.display = r.payment_mode === "cash" ? "none" : "block";
+    document.getElementById("pChequeNote").style.display = cheque ? "block" : "none";
+
+    const refDateStr = r.cheque_date ? new Date(r.cheque_date).toLocaleDateString("en-IN") : "-";
+    if (cheque) {
+      document.getElementById("pChqNo").textContent = r.cheque_dd_no || "-";
+      document.getElementById("pChqDate").textContent = refDateStr;
+      document.getElementById("pRefBank").textContent = r.cheque_bank || "-";
+      document.getElementById("pCity").textContent = r.donor_city || "-";
+    } else if (online) {
+      document.getElementById("pTxnId").textContent = r.cheque_dd_no || "-";
+      document.getElementById("pTxnDate").textContent = refDateStr;
+      document.getElementById("pCity2").textContent = r.donor_city || "-";
+    } else {
+      document.getElementById("pCity2").textContent = r.donor_city || "-";
+    }
   }
 }
 

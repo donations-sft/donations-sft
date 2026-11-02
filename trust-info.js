@@ -7,6 +7,6 @@ const TRUST_INFO = {
   commissionerNote: "Registered with office of the Commissioner Income Tax under Section 80G [clause (i) of first proviso to sub-section (5)] Vide registration No. AAATS5947AF20084 dated 24.09.2021 valid up to 31.03.2026",
   address: "At & Post: Kalali, Tal. & Dist.: Vadodara, Gujarat - India, Pin: 390 012",
   phone: "Mob: 9737704222 / 9737708333 / 7201000290",
-  email: "sf@shroffsfoundation.org",
+  email: "sft@shroffsfoundation.org",
   website: "www.shroffsfoundation.org"
 };
