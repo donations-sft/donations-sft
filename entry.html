@@ -113,13 +113,17 @@
     <button id="saveBtn">Save Receipt</button>
   </div>
 
-  <div class="wide-card hidden" id="successCard">
-    <h2>Receipt Saved</h2>
-    <p>Receipt No. <strong id="savedReceiptNo"></strong> has been recorded.</p>
+</div>
+
+<!-- Receipt preview popup -->
+<div id="receiptModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <h2>Receipt No. <span id="savedReceiptNo"></span> Saved</h2>
+    <img id="receiptPreviewImg" alt="Receipt preview" />
     <div class="actions-row">
-      <button id="printBtn">Print Receipt</button>
-      <button id="whatsappBtn" class="secondary">Share on WhatsApp</button>
-      <button id="emailBtn" class="secondary">Email Receipt</button>
+      <button id="printBtn">Print</button>
+      <button id="whatsappBtn" class="secondary">Send on WhatsApp</button>
+      <button id="emailBtn" class="secondary">Email</button>
       <button id="newReceiptBtn" class="secondary">New Receipt</button>
     </div>
     <div id="shareMsg"></div>
@@ -181,6 +185,7 @@
 <script>
 let headsIndex = null;
 let lastSavedReceipt = null;
+let lastReceiptCanvas = null;
 
 function setRefLabels(mode) {
   const refFields = document.getElementById("refFields");
@@ -361,9 +366,8 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
     mode_label: inkind ? "Inkind" : (paymentMode === "cash" ? "Cash" : (paymentMode === "cheque" ? "Cheque/DD" : "Online"))
   };
 
-  document.getElementById("formCard").classList.add("hidden");
-  document.getElementById("successCard").classList.remove("hidden");
   document.getElementById("savedReceiptNo").textContent = data.receipt_no;
+  await showReceiptPreview();
 
   supabaseClient.functions.invoke("notify-telegram", {
     body: {
@@ -378,7 +382,8 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
 });
 
 document.getElementById("newReceiptBtn").addEventListener("click", () => {
-  document.getElementById("successCard").classList.add("hidden");
+  lastReceiptCanvas = null;
+  document.getElementById("receiptModal").classList.add("hidden");
   document.getElementById("formCard").classList.remove("hidden");
   ["donorName","donorPhone","donorCity","donorEmail","donorAddress","donorPan","amount","itemDesc","refNo","refBank"].forEach(id => {
     document.getElementById(id).value = "";
@@ -447,6 +452,14 @@ function populatePrintArea(r) {
   }
 }
 
+async function showReceiptPreview() {
+  lastReceiptCanvas = await captureReceiptImage();
+  document.getElementById("receiptPreviewImg").src = lastReceiptCanvas.toDataURL("image/png");
+  document.getElementById("formCard").classList.add("hidden");
+  document.getElementById("receiptModal").classList.remove("hidden");
+  shareMsg("");
+}
+
 function lockReceipt() {
   if (!lastSavedReceipt || lastSavedReceipt.printed) return;
   lastSavedReceipt.printed = true;
@@ -474,9 +487,9 @@ async function captureReceiptImage() {
 }
 
 document.getElementById("whatsappBtn").addEventListener("click", async () => {
-  shareMsg("Preparing image…");
+  shareMsg("Preparing…");
   const r = lastSavedReceipt;
-  const canvas = await captureReceiptImage();
+  const canvas = lastReceiptCanvas || await captureReceiptImage();
   const text = `Donation Receipt No. ${r.receipt_no} from Shroffs Foundation Trust. Thank you!`;
 
   canvas.toBlob(async (blob) => {
