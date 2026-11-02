@@ -9,6 +9,7 @@
 <link rel="icon" href="icons/icon-192.png" type="image/png" />
 <link rel="stylesheet" href="styles.css" />
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 </head>
 <body>
 
@@ -114,9 +115,24 @@
 
     <div class="actions-row">
       <button id="saveBtn">Save Changes</button>
-      <button id="printBtn" class="secondary">Print Receipt</button>
+      <button id="printBtn" class="secondary">View / Print Receipt</button>
       <a href="./reports.html"><button type="button" class="secondary">Back to Reports</button></a>
     </div>
+  </div>
+</div>
+
+<!-- Receipt preview popup -->
+<div id="receiptModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <h2>Receipt No. <span id="modalReceiptNo"></span></h2>
+    <img id="receiptPreviewImg" alt="Receipt preview" />
+    <div class="actions-row">
+      <button id="doPrintBtn">Print</button>
+      <button id="whatsappBtn" class="secondary">Send on WhatsApp</button>
+      <button id="emailBtn" class="secondary">Email</button>
+      <button id="closeModalBtn" class="secondary">Close</button>
+    </div>
+    <div id="shareMsg"></div>
   </div>
 </div>
 
@@ -369,13 +385,93 @@ function populatePrintArea(r) {
   }
 }
 
+function shareMsg(text) {
+  document.getElementById("shareMsg").textContent = text;
+}
+
+let lastReceiptCanvas = null;
+
+async function captureReceiptImage() {
+  populatePrintArea(currentReceipt);
+  const printArea = document.getElementById("printArea");
+  printArea.style.cssText = "display:block; position:fixed; left:-9999px; top:0;";
+  const canvas = await html2canvas(printArea.querySelector(".receipt-sheet"), { scale: 2, backgroundColor: "#ffffff" });
+  printArea.style.cssText = "";
+  return canvas;
+}
+
+async function lockReceipt() {
+  if (!currentReceipt || currentReceipt.printed) return;
+  currentReceipt.printed = true;
+  await supabaseClient.rpc("mark_printed", { p_receipt_id: currentReceipt.id }).catch(() => {});
+}
+
 document.getElementById("printBtn").addEventListener("click", async () => {
+  lastReceiptCanvas = await captureReceiptImage();
+  document.getElementById("receiptPreviewImg").src = lastReceiptCanvas.toDataURL("image/png");
+  document.getElementById("modalReceiptNo").textContent = currentReceipt.receipt_no;
+  document.getElementById("receiptModal").classList.remove("hidden");
+  shareMsg("");
+});
+
+document.getElementById("closeModalBtn").addEventListener("click", () => {
+  document.getElementById("receiptModal").classList.add("hidden");
+});
+
+document.getElementById("doPrintBtn").addEventListener("click", () => {
   populatePrintArea(currentReceipt);
   window.print();
-  if (!currentReceipt.printed) {
-    currentReceipt.printed = true;
-    await supabaseClient.rpc("mark_printed", { p_receipt_id: currentReceipt.id }).catch(() => {});
-  }
+  lockReceipt();
+});
+
+document.getElementById("whatsappBtn").addEventListener("click", async () => {
+  shareMsg("Preparing…");
+  const r = currentReceipt;
+  const canvas = lastReceiptCanvas || await captureReceiptImage();
+  const text = `Donation Receipt No. ${r.receipt_no} from Shroffs Foundation Trust. Thank you!`;
+
+  canvas.toBlob(async (blob) => {
+    const file = new File([blob], `receipt-${r.receipt_no}.png`, { type: "image/png" });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], text });
+        shareMsg("Shared.");
+        return;
+      } catch (e) {
+        // user cancelled or share failed — fall through to download+wa.me
+      }
+    }
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `receipt-${r.receipt_no}.png`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    let digits = (r.donor_phone || "").replace(/\D/g, "");
+    if (digits.length === 10) digits = "91" + digits;
+    const waUrl = digits
+      ? `https://wa.me/${digits}?text=${encodeURIComponent(text)}`
+      : `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(waUrl, "_blank");
+    alert("Receipt image downloaded. Attach it manually in WhatsApp before sending — WhatsApp doesn't accept images via this link directly.");
+    shareMsg("");
+  }, "image/png");
+
+  lockReceipt();
+});
+
+document.getElementById("emailBtn").addEventListener("click", () => {
+  const r = currentReceipt;
+  const to = r.donor_email || "";
+  const subject = `Donation Receipt No. ${r.receipt_no} - Shroffs Foundation Trust`;
+  const body = `Dear ${r.donor_name},\n\nThank you for your donation. Receipt No. ${r.receipt_no}, dated ${new Date(r.receipt_date).toLocaleDateString("en-IN")}.\n\nFor Shroffs Foundation Trust`;
+  window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  if (!to) shareMsg("No email on file for this donor — fill it in manually in your mail app.");
+  else shareMsg("");
+  lockReceipt();
 });
 
 document.getElementById("saveBtn").addEventListener("click", async () => {
