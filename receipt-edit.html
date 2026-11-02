@@ -463,9 +463,7 @@ document.getElementById("whatsappBtn").addEventListener("click", async () => {
     URL.revokeObjectURL(url);
 
     const target = formatWhatsAppNumber(r.donor_phone);
-    const waUrl = target
-      ? `https://wa.me/${target}?text=${encodeURIComponent(text)}`
-      : `https://wa.me/?text=${encodeURIComponent(text)}`;
+    const waUrl = `whatsapp://send?phone=${target}&text=${encodeURIComponent(text)}`;
     alert("Receipt image downloaded. Attach it manually in WhatsApp before sending — WhatsApp doesn't accept images via this link directly.");
     window.location.href = waUrl;
     shareMsg("");
