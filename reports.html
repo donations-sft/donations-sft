@@ -58,6 +58,21 @@
       </div>
     </div>
 
+    <div id="purposeHeadWrap" class="hidden">
+      <label for="rptMainHead">Head</label>
+      <select id="rptMainHead"></select>
+
+      <div id="rptSubHeadWrap" class="hidden">
+        <label for="rptSubHead">Sub Head</label>
+        <select id="rptSubHead"></select>
+      </div>
+
+      <div id="rptFurtherHeadWrap" class="hidden">
+        <label for="rptFurtherHead">Further Head</label>
+        <select id="rptFurtherHead"></select>
+      </div>
+    </div>
+
     <div class="actions-row" style="margin-top:14px;">
       <button id="runBtn">Run Report</button>
       <button id="csvBtn" class="secondary">Export CSV</button>
@@ -77,6 +92,46 @@
 let headsIndex = null;
 let lastRows = [];
 let lastMode = "none";
+
+document.getElementById("groupBy").addEventListener("change", (e) => {
+  const wrap = document.getElementById("purposeHeadWrap");
+  if (e.target.value === "purpose") {
+    wrap.classList.remove("hidden");
+    populateSelect(document.getElementById("rptMainHead"), headsIndex.mainHeads, "All Heads");
+    document.getElementById("rptSubHeadWrap").classList.add("hidden");
+    document.getElementById("rptFurtherHeadWrap").classList.add("hidden");
+  } else {
+    wrap.classList.add("hidden");
+  }
+});
+
+document.getElementById("rptMainHead").addEventListener("change", (e) => {
+  const subWrap = document.getElementById("rptSubHeadWrap");
+  const furtherWrap = document.getElementById("rptFurtherHeadWrap");
+  furtherWrap.classList.add("hidden");
+  document.getElementById("rptFurtherHead").innerHTML = "";
+
+  const children = e.target.value ? headsIndex.childrenOf(e.target.value) : [];
+  if (children.length) {
+    populateSelect(document.getElementById("rptSubHead"), children, "All Sub Heads");
+    subWrap.classList.remove("hidden");
+  } else {
+    subWrap.classList.add("hidden");
+    document.getElementById("rptSubHead").innerHTML = "";
+  }
+});
+
+document.getElementById("rptSubHead").addEventListener("change", (e) => {
+  const furtherWrap = document.getElementById("rptFurtherHeadWrap");
+  const children = e.target.value ? headsIndex.childrenOf(e.target.value) : [];
+  if (children.length) {
+    populateSelect(document.getElementById("rptFurtherHead"), children, "All");
+    furtherWrap.classList.remove("hidden");
+  } else {
+    furtherWrap.classList.add("hidden");
+    document.getElementById("rptFurtherHead").innerHTML = "";
+  }
+});
 
 document.getElementById("quickRange").addEventListener("change", (e) => {
   const now = new Date();
@@ -156,6 +211,17 @@ document.getElementById("runBtn").addEventListener("click", async () => {
   let query = supabaseClient.from("receipts").select("*");
   if (from) query = query.gte("receipt_date", from);
   if (to) query = query.lte("receipt_date", to);
+
+  let selectedHeadLabel = null;
+  if (mode === "purpose") {
+    const mainId = document.getElementById("rptMainHead").value;
+    const subId = document.getElementById("rptSubHead").value;
+    const furtherId = document.getElementById("rptFurtherHead").value;
+    if (furtherId) { query = query.eq("further_head_id", furtherId); selectedHeadLabel = headsIndex.nameOf(furtherId); }
+    else if (subId) { query = query.eq("sub_head_id", subId); selectedHeadLabel = headsIndex.nameOf(subId); }
+    else if (mainId) { query = query.eq("main_head_id", mainId); selectedHeadLabel = headsIndex.nameOf(mainId); }
+  }
+
   query = query.order("receipt_date", { ascending: mode !== "amount" });
   if (mode === "amount") query = query.order("amount", { ascending: false, nullsFirst: false });
 
@@ -169,7 +235,11 @@ document.getElementById("runBtn").addEventListener("click", async () => {
   if (!data.length) { area.innerHTML = "No receipts in this range."; return; }
 
   if (mode === "donor") area.innerHTML = renderGrouped(data, (r) => r.donor_name, "Donor");
-  else if (mode === "purpose") area.innerHTML = renderGrouped(data, (r) => purposeOf(r), "Purpose");
+  else if (mode === "purpose") {
+    area.innerHTML = selectedHeadLabel
+      ? `<h2 style="margin-top:0;">${selectedHeadLabel}</h2>` + renderFlat(data)
+      : renderGrouped(data, (r) => purposeOf(r), "Purpose");
+  }
   else if (mode === "city") area.innerHTML = renderGrouped(data, (r) => r.donor_city, "City");
   else area.innerHTML = renderFlat(data);
 });
