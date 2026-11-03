@@ -201,7 +201,15 @@ document.getElementById("logoutBtnPaused").onclick = async () => {
 };
 
 async function routeAfterLogin() {
-  const profile = await getMyProfile();
+  let profile;
+  try {
+    profile = await getMyProfile();
+  } catch (e) {
+    hideAllForms();
+    loginForm.classList.remove("hidden");
+    showMsg("Couldn't load your account (connection issue) — please try logging in again.", "error");
+    return;
+  }
   if (profile && profile.active === false) {
     hideAllForms();
     pausedPanel.classList.remove("hidden");

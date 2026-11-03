@@ -11,7 +11,10 @@ async function getMyProfile() {
     .select("id, full_name, role, active")
     .eq("id", user.id)
     .single();
-  if (error) return null;
+  if (error) {
+    console.error("getMyProfile failed:", error.message);
+    throw error;
+  }
   return data;
 }
 
@@ -21,7 +24,13 @@ async function requireRole(allowedRoles) {
     window.location.href = "./index.html";
     return null;
   }
-  const profile = await getMyProfile();
+  let profile;
+  try {
+    profile = await getMyProfile();
+  } catch (e) {
+    window.location.href = "./index.html";
+    return null;
+  }
   if (!profile || !allowedRoles.includes(profile.role) || profile.active === false) {
     if (profile && profile.active === false) await supabaseClient.auth.signOut();
     window.location.href = "./index.html";
