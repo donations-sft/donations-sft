@@ -29,6 +29,24 @@
       <button id="loginBtn">Log In</button>
 
       <div class="link-row">New clerk? <a id="showSignup">Create an account</a></div>
+      <div class="link-row"><a id="showForgot">Forgot password?</a></div>
+    </div>
+
+    <div id="forgotForm" class="hidden">
+      <label for="forgotEmail">Email</label>
+      <input id="forgotEmail" type="email" autocomplete="username" />
+
+      <button id="forgotBtn">Send Reset Link</button>
+
+      <div class="link-row"><a id="backToLoginFromForgot">Back to log in</a></div>
+    </div>
+
+    <div id="resetPasswordForm" class="hidden">
+      <p>Enter a new password for your account.</p>
+      <label for="newPassword">New Password</label>
+      <input id="newPassword" type="password" autocomplete="new-password" />
+
+      <button id="setNewPasswordBtn">Set Password</button>
     </div>
 
     <div id="signupForm" class="hidden">
@@ -59,8 +77,18 @@
 <script>
 const loginForm = document.getElementById("loginForm");
 const signupForm = document.getElementById("signupForm");
+const forgotForm = document.getElementById("forgotForm");
+const resetPasswordForm = document.getElementById("resetPasswordForm");
 const pendingPanel = document.getElementById("pendingPanel");
 const msg = document.getElementById("msg");
+
+function hideAllForms() {
+  loginForm.classList.add("hidden");
+  signupForm.classList.add("hidden");
+  forgotForm.classList.add("hidden");
+  resetPasswordForm.classList.add("hidden");
+  pendingPanel.classList.add("hidden");
+}
 
 function showMsg(text, type) {
   msg.textContent = text;
@@ -72,14 +100,48 @@ function clearMsg() {
 }
 
 document.getElementById("showSignup").onclick = () => {
-  loginForm.classList.add("hidden");
+  hideAllForms();
   signupForm.classList.remove("hidden");
   clearMsg();
 };
 document.getElementById("showLogin").onclick = () => {
-  signupForm.classList.add("hidden");
+  hideAllForms();
   loginForm.classList.remove("hidden");
   clearMsg();
+};
+document.getElementById("showForgot").onclick = () => {
+  hideAllForms();
+  forgotForm.classList.remove("hidden");
+  clearMsg();
+};
+document.getElementById("backToLoginFromForgot").onclick = () => {
+  hideAllForms();
+  loginForm.classList.remove("hidden");
+  clearMsg();
+};
+
+document.getElementById("forgotBtn").onclick = async () => {
+  clearMsg();
+  const email = document.getElementById("forgotEmail").value.trim();
+  if (!email) { showMsg("Enter your email.", "error"); return; }
+
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + "/index.html"
+  });
+  if (error) { showMsg(error.message, "error"); return; }
+  showMsg("If that email is registered, a reset link has been sent. Check your inbox.", "info");
+};
+
+document.getElementById("setNewPasswordBtn").onclick = async () => {
+  clearMsg();
+  const newPassword = document.getElementById("newPassword").value;
+  if (!newPassword || newPassword.length < 6) {
+    showMsg("Password must be at least 6 characters.", "error"); return;
+  }
+  const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+  if (error) { showMsg(error.message, "error"); return; }
+  showMsg("Password updated. Logging you in…", "info");
+  await routeAfterLogin();
 };
 
 document.getElementById("loginBtn").onclick = async () => {
@@ -129,8 +191,7 @@ document.getElementById("logoutBtn").onclick = async () => {
 async function routeAfterLogin() {
   const profile = await getMyProfile();
   if (!profile || !profile.role) {
-    loginForm.classList.add("hidden");
-    signupForm.classList.add("hidden");
+    hideAllForms();
     pendingPanel.classList.remove("hidden");
     return;
   }
@@ -141,9 +202,17 @@ async function routeAfterLogin() {
   }
 }
 
+supabaseClient.auth.onAuthStateChange((event, session) => {
+  if (event === "PASSWORD_RECOVERY") {
+    hideAllForms();
+    resetPasswordForm.classList.remove("hidden");
+  }
+});
+
 (async () => {
+  const isRecovery = window.location.hash.includes("type=recovery");
   const { data: { session } } = await supabaseClient.auth.getSession();
-  if (session) await routeAfterLogin();
+  if (session && !isRecovery) await routeAfterLogin();
 })();
 
 if ("serviceWorker" in navigator) {
