@@ -168,6 +168,15 @@ button.secondary:hover { background: #fdf1f1; }
   padding: 20px;
 }
 
+.app-footer {
+  text-align: center;
+  padding: 20px 10px 10px;
+  font-size: 0.78rem;
+  color: #8a7f75;
+}
+.app-footer a { color: #8a7f75; }
+.app-footer a:hover { color: #b91c1c; }
+
 .wide-card {
   background: #fff;
   border-radius: 12px;
