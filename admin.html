@@ -49,6 +49,15 @@
   </div>
 
   <div class="wide-card">
+    <h2>My Account</h2>
+    <p class="field-note">Current login email: <strong id="myEmail"></strong></p>
+    <label for="newEmailInput">New Email</label>
+    <input id="newEmailInput" type="email" placeholder="donations.sft@gmail.com" />
+    <button id="changeEmailBtn">Update Email</button>
+    <div id="emailChangeMsg"></div>
+  </div>
+
+  <div class="wide-card">
     <h2>Receipt Numbering</h2>
     <p class="field-note">Set this once before go-live, to whatever number comes after the last paper-book receipt in use at that time.</p>
     <label for="nextReceiptNo">Next Receipt No.</label>
@@ -204,12 +213,25 @@ document.getElementById("logoutBtn").onclick = async () => {
   window.location.href = "./index.html";
 };
 
+document.getElementById("changeEmailBtn").addEventListener("click", async () => {
+  const msg = document.getElementById("emailChangeMsg");
+  const newEmail = document.getElementById("newEmailInput").value.trim();
+  if (!newEmail) { msg.textContent = "Enter a new email."; msg.className = "msg error"; return; }
+
+  const { error } = await supabaseClient.auth.updateUser({ email: newEmail });
+  if (error) { msg.textContent = error.message; msg.className = "msg error"; return; }
+  msg.textContent = "Confirmation link sent to " + newEmail + " — click it to finish the change. You may also get a notice at your old email.";
+  msg.className = "msg info";
+});
+
 let iAmSuperAdmin = false;
 
 (async () => {
   const profile = await requireRole(["admin"]);
   if (!profile) return;
   iAmSuperAdmin = profile.is_super_admin === true;
+  const { data: { user } } = await supabaseClient.auth.getUser();
+  document.getElementById("myEmail").textContent = user.email;
   await loadLiveTotals();
   await loadPending();
   await loadUsers();
