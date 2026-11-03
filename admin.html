@@ -42,7 +42,7 @@
   <div class="wide-card">
     <h2>All Users</h2>
     <table class="report-table" id="usersTable">
-      <thead><tr><th>Name</th><th>Email</th><th>Role</th></tr></thead>
+      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -126,17 +126,37 @@ async function loadPending() {
 }
 
 async function loadUsers() {
+  const { data: { user: me } } = await supabaseClient.auth.getUser();
   const { data, error } = await supabaseClient
     .from("profiles")
-    .select("full_name, email, role")
+    .select("id, full_name, email, role, active")
     .order("created_at");
   const tbody = document.querySelector("#usersTable tbody");
   tbody.innerHTML = "";
   if (error) return;
   data.forEach((u) => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${u.full_name || "-"}</td><td>${u.email || "-"}</td><td>${u.role || "pending"}</td>`;
+    const statusLabel = u.active === false
+      ? '<span class="pill">Paused</span>'
+      : '<span class="pill ok">Active</span>';
+    const actionCell = (u.id === me.id)
+      ? ""
+      : `<button class="secondary pauseBtn" data-id="${u.id}" data-active="${u.active !== false}">${u.active === false ? "Resume" : "Pause"}</button>`;
+    tr.innerHTML = `<td>${u.full_name || "-"}</td><td>${u.email || "-"}</td><td>${u.role || "pending"}</td><td>${statusLabel}</td><td>${actionCell}</td>`;
     tbody.appendChild(tr);
+  });
+
+  document.querySelectorAll(".pauseBtn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      const currentlyActive = btn.dataset.active === "true";
+      const { error } = await supabaseClient.rpc("admin_set_user_active", {
+        p_user_id: btn.dataset.id,
+        p_active: !currentlyActive
+      });
+      if (error) { alert(error.message); btn.disabled = false; return; }
+      await loadUsers();
+    });
   });
 }
 

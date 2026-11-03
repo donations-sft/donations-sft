@@ -69,6 +69,11 @@
       <button id="logoutBtn" class="secondary">Log Out</button>
     </div>
 
+    <div id="pausedPanel" class="hidden">
+      <p>Your account has been paused by the admin. Contact the trust office if you believe this is a mistake.</p>
+      <button id="logoutBtnPaused" class="secondary">Log Out</button>
+    </div>
+
     <div id="msg"></div>
   </div>
 </div>
@@ -80,6 +85,7 @@ const signupForm = document.getElementById("signupForm");
 const forgotForm = document.getElementById("forgotForm");
 const resetPasswordForm = document.getElementById("resetPasswordForm");
 const pendingPanel = document.getElementById("pendingPanel");
+const pausedPanel = document.getElementById("pausedPanel");
 const msg = document.getElementById("msg");
 
 function hideAllForms() {
@@ -88,6 +94,7 @@ function hideAllForms() {
   forgotForm.classList.add("hidden");
   resetPasswordForm.classList.add("hidden");
   pendingPanel.classList.add("hidden");
+  pausedPanel.classList.add("hidden");
 }
 
 function showMsg(text, type) {
@@ -184,12 +191,22 @@ document.getElementById("signupBtn").onclick = async () => {
 
 document.getElementById("logoutBtn").onclick = async () => {
   await supabaseClient.auth.signOut();
-  pendingPanel.classList.add("hidden");
+  hideAllForms();
+  loginForm.classList.remove("hidden");
+};
+document.getElementById("logoutBtnPaused").onclick = async () => {
+  await supabaseClient.auth.signOut();
+  hideAllForms();
   loginForm.classList.remove("hidden");
 };
 
 async function routeAfterLogin() {
   const profile = await getMyProfile();
+  if (profile && profile.active === false) {
+    hideAllForms();
+    pausedPanel.classList.remove("hidden");
+    return;
+  }
   if (!profile || !profile.role) {
     hideAllForms();
     pendingPanel.classList.remove("hidden");

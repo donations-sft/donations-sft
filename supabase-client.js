@@ -8,7 +8,7 @@ async function getMyProfile() {
   if (!user) return null;
   const { data, error } = await supabaseClient
     .from("profiles")
-    .select("id, full_name, role")
+    .select("id, full_name, role, active")
     .eq("id", user.id)
     .single();
   if (error) return null;
@@ -22,7 +22,8 @@ async function requireRole(allowedRoles) {
     return null;
   }
   const profile = await getMyProfile();
-  if (!profile || !allowedRoles.includes(profile.role)) {
+  if (!profile || !allowedRoles.includes(profile.role) || profile.active === false) {
+    if (profile && profile.active === false) await supabaseClient.auth.signOut();
     window.location.href = "./index.html";
     return null;
   }
