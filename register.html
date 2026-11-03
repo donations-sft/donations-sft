@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Receipt Register — SFT Donations</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#b91c1c" />
+<link rel="icon" href="icons/icon-192.png" type="image/png" />
+<link rel="stylesheet" href="styles.css" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brandline"><img src="icons/icon-192.png" alt="SFT" /><div class="brand-text"><span>Shroffs Foundation Trust</span><img class="brand-tagline-img" src="icons/tagline-white.png" alt="Seva Sadbhav Vikas" /></div></div>
+  <nav>
+    <a href="./entry.html">New Receipt</a>
+    <a href="./register.html">Receipt Register</a>
+    <a href="./reports.html">Reports</a>
+    <a id="adminLink" href="./admin.html" class="hidden">Admin</a>
+  </nav>
+  <button id="logoutBtn">Log Out</button>
+</div>
+
+<div class="content">
+  <div class="wide-card">
+    <h2>Receipt Register</h2>
+
+    <div class="row">
+      <div>
+        <label for="searchBox">Search (Receipt No. or Donor Name)</label>
+        <input id="searchBox" type="text" placeholder="e.g. 4189 or Ramesh" />
+      </div>
+      <div>
+        <label for="dateFrom">From</label>
+        <input id="dateFrom" type="date" />
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label for="dateTo">To</label>
+        <input id="dateTo" type="date" />
+      </div>
+      <div></div>
+    </div>
+
+    <div class="actions-row" style="margin-top:10px;">
+      <button id="searchBtn">Search</button>
+      <button id="clearBtn" class="secondary">Clear</button>
+    </div>
+
+    <div id="registerMsg"></div>
+  </div>
+
+  <div class="wide-card">
+    <div id="registerArea">Search above, or just click Search to see the most recent receipts.</div>
+  </div>
+</div>
+
+<!-- Receipt preview popup -->
+<div id="receiptModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <h2>Receipt No. <span id="modalReceiptNo"></span></h2>
+    <img id="receiptPreviewImg" alt="Receipt preview" />
+    <div class="actions-row">
+      <button id="doPrintBtn">Print</button>
+      <button id="whatsappBtn" class="secondary">Send on WhatsApp</button>
+      <button id="emailBtn" class="secondary">Email</button>
+      <button id="closeModalBtn" class="secondary">Close</button>
+    </div>
+    <div id="shareMsg"></div>
+  </div>
+</div>
+
+<!-- Printable receipt -->
+<div id="printArea">
+  <div class="receipt-sheet">
+    <div class="r-head">
+      <div class="r-logo">
+        <img src="icons/logo-full.png" alt="Shroffs Foundation Trust" class="r-logo-full" />
+        <h2>Shroffs Foundation Trust</h2>
+      </div>
+      <div class="r-reg">
+        <div id="pReg80G" class="r-reg-number"></div>
+        <div id="pTaxNote"></div>
+      </div>
+    </div>
+    <div class="r-title">Donation Receipt</div>
+    <div class="r-noDate">
+      <div>No. <strong id="pReceiptNo"></strong></div>
+      <div>Date: <strong id="pDate"></strong></div>
+    </div>
+
+    <div class="r-line">Received with thanks from <span class="fill" id="pDonor"></span></div>
+    <div class="r-line" id="pAmountLine">the sum of ₹ <span class="fill" id="pAmountWords"></span></div>
+    <div class="r-line" id="pItemLine">the following item(s): <span class="fill" id="pItemDesc"></span></div>
+    <div class="r-line" id="pChequeLine">By Cheque No. <span class="fill" id="pChqNo"></span> Dt. <span class="fill" id="pChqDate"></span></div>
+    <div class="r-line" id="pOnlineLine">By Online, Txn ID <span class="fill" id="pTxnId"></span> Dt. <span class="fill" id="pTxnDate"></span></div>
+    <div class="r-line" id="pBankLine">drawn on <span class="fill" id="pRefBank"></span> At <span class="fill" id="pCity"></span></div>
+    <div class="r-line" id="pCityOnlyLine">At <span class="fill" id="pCity2"></span></div>
+    <div class="r-line">for <span class="fill" id="pPurpose"></span></div>
+
+    <div class="r-amountbox" id="pAmountBox"><div class="box">₹ <span id="pAmount"></span></div></div>
+
+    <div class="r-note" id="pChequeNote">Subject to realisation of Cheque / Draft</div>
+
+    <div class="r-sign">
+      <div></div>
+      <div class="for-trust">
+        For Shroffs Foundation Trust<br /><br /><br />
+        Authorised Signatory
+      </div>
+    </div>
+
+    <div class="r-footer">
+      <div id="pTrustReg"></div>
+      <div id="pCommissionerNote"></div>
+      <div id="pAddress"></div>
+      <div id="pContact"></div>
+    </div>
+  </div>
+</div>
+
+<script src="supabase-client.js"></script>
+<script src="trust-info.js"></script>
+<script src="heads.js"></script>
+<script>
+let headsIndex = null;
+let currentReceipt = null;
+let lastReceiptCanvas = null;
+let rows = [];
+
+function fmtAmt(n) {
+  return Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2 });
+}
+
+function purposeLabel(mainId, subId, furtherId) {
+  const parts = [headsIndex.nameOf(mainId)];
+  if (subId) parts.push(headsIndex.nameOf(subId));
+  if (furtherId) parts.push(headsIndex.nameOf(furtherId));
+  return parts.join(" / ");
+}
+
+function amountInWords(num) {
+  const a = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+    "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  const b = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+  function two(n) { if (n < 20) return a[n]; return b[Math.floor(n / 10)] + (n % 10 ? " " + a[n % 10] : ""); }
+  function three(n) { if (n >= 100) return a[Math.floor(n / 100)] + " Hundred" + (n % 100 ? " " + two(n % 100) : ""); return two(n); }
+  let n = Math.floor(num);
+  if (n === 0) return "Zero Rupees Only";
+  const crore = Math.floor(n / 10000000); n %= 10000000;
+  const lakh = Math.floor(n / 100000); n %= 100000;
+  const thousand = Math.floor(n / 1000); n %= 1000;
+  const hundred = n;
+  let parts = [];
+  if (crore) parts.push(three(crore) + " Crore");
+  if (lakh) parts.push(three(lakh) + " Lakh");
+  if (thousand) parts.push(three(thousand) + " Thousand");
+  if (hundred) parts.push(three(hundred));
+  return parts.join(" ") + " Rupees Only";
+}
+
+function formatWhatsAppNumber(phone) {
+  let digits = (phone || "").replace(/\D/g, "");
+  if (!digits) return null;
+  if (digits.length === 10) digits = "91" + digits;
+  else if (digits.length === 11 && digits.startsWith("0")) digits = "91" + digits.slice(1);
+  return digits;
+}
+
+function shareMsg(text) {
+  document.getElementById("shareMsg").textContent = text;
+}
+
+function renderRegister(data) {
+  const area = document.getElementById("registerArea");
+  if (!data.length) { area.innerHTML = "No receipts found."; return; }
+
+  let html = `<table class="report-table"><thead><tr>
+    <th>Receipt No</th><th>Date</th><th>Donor</th><th>Head</th><th>Amount</th><th></th>
+  </tr></thead><tbody>`;
+  data.forEach((r) => {
+    const amountCell = r.payment_mode === "inkind" ? (r.item_description || "-") : fmtAmt(r.amount);
+    const lockNote = r.printed ? ' <span class="pill">printed</span>' : "";
+    html += `<tr>
+      <td>${r.receipt_no}</td>
+      <td>${new Date(r.receipt_date).toLocaleDateString("en-IN")}</td>
+      <td>${r.donor_name}</td>
+      <td>${purposeLabel(r.main_head_id, r.sub_head_id, r.further_head_id)}</td>
+      <td>${amountCell}${lockNote}</td>
+      <td><button class="secondary viewBtn" data-id="${r.id}">View / Print / Send</button></td>
+    </tr>`;
+  });
+  html += `</tbody></table>`;
+  area.innerHTML = html;
+
+  document.querySelectorAll(".viewBtn").forEach((btn) => {
+    btn.addEventListener("click", () => openReceipt(btn.dataset.id));
+  });
+}
+
+document.getElementById("searchBtn").addEventListener("click", async () => {
+  const msg = document.getElementById("registerMsg");
+  msg.textContent = ""; msg.className = "";
+
+  const term = document.getElementById("searchBox").value.trim();
+  const from = document.getElementById("dateFrom").value;
+  const to = document.getElementById("dateTo").value;
+
+  let query = supabaseClient.from("receipts").select("*").order("receipt_date", { ascending: false }).limit(100);
+  if (from) query = query.gte("receipt_date", from);
+  if (to) query = query.lte("receipt_date", to);
+  if (term) {
+    const asNumber = parseInt(term, 10);
+    if (!isNaN(asNumber) && String(asNumber) === term) {
+      query = query.eq("receipt_no", asNumber);
+    } else {
+      query = query.ilike("donor_name", `%${term}%`);
+    }
+  }
+
+  const { data, error } = await query;
+  if (error) { msg.textContent = error.message; msg.className = "msg error"; return; }
+  rows = data;
+  renderRegister(data);
+});
+
+document.getElementById("clearBtn").addEventListener("click", () => {
+  document.getElementById("searchBox").value = "";
+  document.getElementById("dateFrom").value = "";
+  document.getElementById("dateTo").value = "";
+  document.getElementById("registerArea").innerHTML = "Search above, or just click Search to see the most recent receipts.";
+});
+
+function populatePrintArea(r) {
+  const inkind = r.payment_mode === "inkind";
+  document.getElementById("pReg80G").textContent = TRUST_INFO.reg80G;
+  document.getElementById("pTaxNote").textContent = TRUST_INFO.taxNote;
+  document.getElementById("pReceiptNo").textContent = r.receipt_no;
+  document.getElementById("pDate").textContent = new Date(r.receipt_date).toLocaleDateString("en-IN");
+  document.getElementById("pDonor").textContent = r.donor_name;
+  document.getElementById("pPurpose").textContent = purposeLabel(r.main_head_id, r.sub_head_id, r.further_head_id);
+  document.getElementById("pTrustReg").textContent = TRUST_INFO.trustReg + "   " + TRUST_INFO.pan;
+  document.getElementById("pCommissionerNote").textContent = TRUST_INFO.commissionerNote;
+  document.getElementById("pAddress").textContent = TRUST_INFO.address;
+  document.getElementById("pContact").textContent = TRUST_INFO.phone + "   Email: " + TRUST_INFO.email + "   Website: " + TRUST_INFO.website;
+
+  const cash = r.payment_mode === "cash";
+  const cheque = r.payment_mode === "cheque";
+  const online = r.payment_mode === "online";
+
+  document.getElementById("pAmountLine").style.display = inkind ? "none" : "block";
+  document.getElementById("pItemLine").style.display = inkind ? "block" : "none";
+  document.getElementById("pAmountBox").style.display = inkind ? "none" : "flex";
+  document.getElementById("pChequeLine").style.display = cheque ? "block" : "none";
+  document.getElementById("pOnlineLine").style.display = online ? "block" : "none";
+  document.getElementById("pBankLine").style.display = cheque ? "block" : "none";
+  document.getElementById("pCityOnlyLine").style.display = (cash || online || inkind) ? "block" : "none";
+
+  if (inkind) {
+    document.getElementById("pItemDesc").textContent = r.item_description;
+    document.getElementById("pCity2").textContent = r.donor_city || "-";
+    document.getElementById("pChequeNote").style.display = "none";
+  } else {
+    document.getElementById("pAmountWords").textContent = amountInWords(r.amount);
+    document.getElementById("pAmount").textContent = Number(r.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 });
+    document.getElementById("pChequeNote").style.display = cheque ? "block" : "none";
+    const refDateStr = r.cheque_date ? new Date(r.cheque_date).toLocaleDateString("en-IN") : "-";
+    if (cheque) {
+      document.getElementById("pChqNo").textContent = r.cheque_dd_no || "-";
+      document.getElementById("pChqDate").textContent = refDateStr;
+      document.getElementById("pRefBank").textContent = r.cheque_bank || "-";
+      document.getElementById("pCity").textContent = r.donor_city || "-";
+    } else if (online) {
+      document.getElementById("pTxnId").textContent = r.cheque_dd_no || "-";
+      document.getElementById("pTxnDate").textContent = refDateStr;
+      document.getElementById("pCity2").textContent = r.donor_city || "-";
+    } else {
+      document.getElementById("pCity2").textContent = r.donor_city || "-";
+    }
+  }
+}
+
+async function captureReceiptImage() {
+  populatePrintArea(currentReceipt);
+  const printArea = document.getElementById("printArea");
+  printArea.style.cssText = "display:block; position:fixed; left:-9999px; top:0;";
+  const canvas = await html2canvas(printArea.querySelector(".receipt-sheet"), { scale: 2, backgroundColor: "#ffffff" });
+  printArea.style.cssText = "";
+  return canvas;
+}
+
+async function lockReceipt() {
+  if (!currentReceipt || currentReceipt.printed) return;
+  currentReceipt.printed = true;
+  await supabaseClient.rpc("mark_printed", { p_receipt_id: currentReceipt.id }).catch(() => {});
+}
+
+async function openReceipt(id) {
+  currentReceipt = rows.find((r) => r.id === id);
+  if (!currentReceipt) return;
+  lastReceiptCanvas = await captureReceiptImage();
+  document.getElementById("receiptPreviewImg").src = lastReceiptCanvas.toDataURL("image/png");
+  document.getElementById("modalReceiptNo").textContent = currentReceipt.receipt_no;
+  document.getElementById("receiptModal").classList.remove("hidden");
+  shareMsg("");
+}
+
+document.getElementById("closeModalBtn").addEventListener("click", () => {
+  document.getElementById("receiptModal").classList.add("hidden");
+});
+
+document.getElementById("doPrintBtn").addEventListener("click", () => {
+  populatePrintArea(currentReceipt);
+  window.print();
+  lockReceipt();
+});
+
+document.getElementById("whatsappBtn").addEventListener("click", async () => {
+  const r = currentReceipt;
+  const target = formatWhatsAppNumber(r.donor_phone);
+  if (!target) {
+    alert("No WhatsApp number entered for this receipt. Edit the receipt (via Reports) to add one and try again.");
+    return;
+  }
+  const text = `Donation Receipt No. ${r.receipt_no} from Shroffs Foundation Trust. Thank you!`;
+  window.location.href = `whatsapp://send?phone=${target}&text=${encodeURIComponent(text)}`;
+
+  shareMsg("Also downloading the receipt image — attach it in the WhatsApp chat.");
+  const canvas = lastReceiptCanvas || await captureReceiptImage();
+  canvas.toBlob((blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `receipt-${r.receipt_no}.png`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, "image/png");
+
+  lockReceipt();
+});
+
+document.getElementById("emailBtn").addEventListener("click", () => {
+  const r = currentReceipt;
+  const to = r.donor_email || "";
+  const subject = `Donation Receipt No. ${r.receipt_no} - Shroffs Foundation Trust`;
+  const body = `Dear ${r.donor_name},\n\nThank you for your donation. Receipt No. ${r.receipt_no}, dated ${new Date(r.receipt_date).toLocaleDateString("en-IN")}.\n\nFor Shroffs Foundation Trust`;
+  window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  if (!to) shareMsg("No email on file for this donor — fill it in manually in your mail app.");
+  else shareMsg("");
+  lockReceipt();
+});
+
+document.getElementById("logoutBtn").onclick = async () => {
+  await supabaseClient.auth.signOut();
+  window.location.href = "./index.html";
+};
+
+(async () => {
+  const profile = await requireRole(["clerk", "admin"]);
+  if (!profile) return;
+  if (profile.role === "admin") document.getElementById("adminLink").classList.remove("hidden");
+  headsIndex = await loadHeads();
+})();
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js");
+</script>
+</body>
+</html>
