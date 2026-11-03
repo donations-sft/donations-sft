@@ -8,7 +8,7 @@ async function getMyProfile() {
   if (!user) return null;
   const { data, error } = await supabaseClient
     .from("profiles")
-    .select("id, full_name, role, active")
+    .select("id, full_name, role, active, is_super_admin")
     .eq("id", user.id)
     .single();
   if (error) {

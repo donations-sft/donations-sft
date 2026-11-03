@@ -106,7 +106,7 @@ async function loadPending() {
       <div><strong>${u.full_name || "(no name)"}</strong><br /><span class="field-note">${u.email || ""}</span></div>
       <div class="actions-row">
         <button data-id="${u.id}" data-role="clerk" class="approveBtn">Approve as Clerk</button>
-        <button data-id="${u.id}" data-role="admin" class="approveBtn secondary">Approve as Admin</button>
+        ${iAmSuperAdmin ? `<button data-id="${u.id}" data-role="admin" class="approveBtn secondary">Approve as Admin</button>` : ""}
       </div>
     `;
     el.appendChild(row);
@@ -130,7 +130,7 @@ async function loadUsers() {
   const { data: { user: me } } = await supabaseClient.auth.getUser();
   const { data, error } = await supabaseClient
     .from("profiles")
-    .select("id, full_name, email, role, active")
+    .select("id, full_name, email, role, active, is_super_admin")
     .order("created_at");
   const tbody = document.querySelector("#usersTable tbody");
   tbody.innerHTML = "";
@@ -140,10 +140,20 @@ async function loadUsers() {
     const statusLabel = u.active === false
       ? '<span class="pill">Paused</span>'
       : '<span class="pill ok">Active</span>';
-    const actionCell = (u.id === me.id)
-      ? ""
-      : `<button class="secondary pauseBtn" data-id="${u.id}" data-active="${u.active !== false}">${u.active === false ? "Resume" : "Pause"}</button>`;
-    tr.innerHTML = `<td>${u.full_name || "-"}</td><td>${u.email || "-"}</td><td>${u.role || "pending"}</td><td>${statusLabel}</td><td>${actionCell}</td>`;
+    const roleLabel = (u.role || "pending") + (u.is_super_admin ? " (super)" : "");
+
+    const isSelf = u.id === me.id;
+    const canManage = u.role !== "admin" || iAmSuperAdmin;
+
+    let actions = "";
+    if (!isSelf && canManage) {
+      actions += `<button class="secondary pauseBtn" data-id="${u.id}" data-active="${u.active !== false}">${u.active === false ? "Resume" : "Pause"}</button> `;
+    }
+    if (!isSelf && iAmSuperAdmin && u.role === "admin") {
+      actions += `<button class="secondary superBtn" data-id="${u.id}" data-super="${u.is_super_admin === true}">${u.is_super_admin ? "Remove Super Admin" : "Make Super Admin"}</button>`;
+    }
+
+    tr.innerHTML = `<td>${u.full_name || "-"}</td><td>${u.email || "-"}</td><td>${roleLabel}</td><td>${statusLabel}</td><td>${actions}</td>`;
     tbody.appendChild(tr);
   });
 
@@ -154,6 +164,19 @@ async function loadUsers() {
       const { error } = await supabaseClient.rpc("admin_set_user_active", {
         p_user_id: btn.dataset.id,
         p_active: !currentlyActive
+      });
+      if (error) { alert(error.message); btn.disabled = false; return; }
+      await loadUsers();
+    });
+  });
+
+  document.querySelectorAll(".superBtn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      const currentlySuper = btn.dataset.super === "true";
+      const { error } = await supabaseClient.rpc("admin_set_super_admin", {
+        p_user_id: btn.dataset.id,
+        p_is_super: !currentlySuper
       });
       if (error) { alert(error.message); btn.disabled = false; return; }
       await loadUsers();
@@ -181,9 +204,12 @@ document.getElementById("logoutBtn").onclick = async () => {
   window.location.href = "./index.html";
 };
 
+let iAmSuperAdmin = false;
+
 (async () => {
   const profile = await requireRole(["admin"]);
   if (!profile) return;
+  iAmSuperAdmin = profile.is_super_admin === true;
   await loadLiveTotals();
   await loadPending();
   await loadUsers();
