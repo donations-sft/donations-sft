@@ -139,7 +139,7 @@ button.secondary:hover { background: #fdf1f1; }
 }
 
 .topbar .brandline .brand-text { display: flex; flex-direction: column; line-height: 1.2; }
-.topbar .brandline .brand-tagline { font-size: 0.68rem; font-weight: 400; opacity: 0.85; }
+.topbar .brandline .brand-tagline-img { height: 11px; width: auto; margin-top: 2px; opacity: 0.9; }
 
 .topbar img { width: 28px; height: 28px; }
 
