@@ -232,6 +232,31 @@ table.report-table tfoot td {
 }
 .pill.ok { background: #eef6ee; color: #246; }
 
+.tab-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.tab-chip {
+  width: auto;
+  margin: 0;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid #d8cfc5;
+  background: #fff;
+  color: #6b6058;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.tab-chip:hover { border-color: #b91c1c; color: #b91c1c; }
+.tab-chip.active {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  color: #fff;
+}
+
 .actions-row {
   display: flex;
   gap: 10px;

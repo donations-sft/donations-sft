@@ -43,10 +43,7 @@
         <label for="dateTo">To</label>
         <input id="dateTo" type="date" />
       </div>
-      <div>
-        <label for="headFilter">Head</label>
-        <select id="headFilter"><option value="">All Heads</option></select>
-      </div>
+      <div></div>
     </div>
 
     <div class="actions-row" style="margin-top:10px;">
@@ -59,6 +56,7 @@
   </div>
 
   <div class="wide-card">
+    <div id="headTabs" class="tab-chips"></div>
     <div id="registerArea">Search above, or just click Search to see the most recent receipts.</div>
   </div>
   <div class="app-footer">
@@ -177,7 +175,42 @@ function shareMsg(text) {
   document.getElementById("shareMsg").textContent = text;
 }
 
+let displayedRows = [];
+let activeHeadTab = "";
+
 function renderRegister(data) {
+  displayedRows = data;
+  activeHeadTab = "";
+  renderHeadTabs(data);
+  renderTable(data);
+}
+
+function renderHeadTabs(data) {
+  const wrap = document.getElementById("headTabs");
+  if (!data.length) { wrap.innerHTML = ""; return; }
+
+  const names = [...new Set(data.map((r) => headsIndex.nameOf(r.main_head_id)))];
+  if (names.length < 2) { wrap.innerHTML = ""; return; }
+
+  let html = `<button class="tab-chip active" data-head="">All (${data.length})</button>`;
+  names.forEach((name) => {
+    const count = data.filter((r) => headsIndex.nameOf(r.main_head_id) === name).length;
+    html += `<button class="tab-chip" data-head="${name.replace(/"/g, '&quot;')}">${name} (${count})</button>`;
+  });
+  wrap.innerHTML = html;
+
+  wrap.querySelectorAll(".tab-chip").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      wrap.querySelectorAll(".tab-chip").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      activeHeadTab = btn.dataset.head;
+      displayedRows = activeHeadTab ? rows.filter((r) => headsIndex.nameOf(r.main_head_id) === activeHeadTab) : rows;
+      renderTable(displayedRows);
+    });
+  });
+}
+
+function renderTable(data) {
   const area = document.getElementById("registerArea");
   if (!data.length) { area.innerHTML = "No receipts found."; return; }
 
@@ -211,12 +244,10 @@ document.getElementById("searchBtn").addEventListener("click", async () => {
   const term = document.getElementById("searchBox").value.trim();
   const from = document.getElementById("dateFrom").value;
   const to = document.getElementById("dateTo").value;
-  const headId = document.getElementById("headFilter").value;
 
   let query = supabaseClient.from("receipts").select("*").order("receipt_date", { ascending: false }).limit(100);
   if (from) query = query.gte("receipt_date", from);
   if (to) query = query.lte("receipt_date", to);
-  if (headId) query = query.eq("main_head_id", headId);
   if (term) {
     const asNumber = parseInt(term, 10);
     if (!isNaN(asNumber) && String(asNumber) === term) {
@@ -233,23 +264,22 @@ document.getElementById("searchBtn").addEventListener("click", async () => {
 });
 
 document.getElementById("printReportBtn").addEventListener("click", () => {
-  if (!rows.length) { alert("Run a search first — nothing to print."); return; }
+  if (!displayedRows.length) { alert("Run a search first — nothing to print."); return; }
 
   const term = document.getElementById("searchBox").value.trim();
   const from = document.getElementById("dateFrom").value;
   const to = document.getElementById("dateTo").value;
-  const headId = document.getElementById("headFilter").value;
 
   const filterParts = [];
   if (term) filterParts.push(`Search: "${term}"`);
   if (from) filterParts.push(`From: ${new Date(from).toLocaleDateString("en-IN")}`);
   if (to) filterParts.push(`To: ${new Date(to).toLocaleDateString("en-IN")}`);
-  if (headId) filterParts.push(`Head: ${headsIndex.nameOf(headId)}`);
+  if (activeHeadTab) filterParts.push(`Head: ${activeHeadTab}`);
   const filterLine = filterParts.length ? filterParts.join(" &middot; ") : "All receipts (most recent 100)";
 
   let total = 0;
   let tableRows = "";
-  rows.forEach((r) => {
+  displayedRows.forEach((r) => {
     const amountCell = r.payment_mode === "inkind" ? (r.item_description || "-") : fmtAmt(r.amount);
     total += Number(r.amount) || 0;
     tableRows += `<tr>
@@ -295,7 +325,7 @@ document.getElementById("clearBtn").addEventListener("click", () => {
   document.getElementById("searchBox").value = "";
   document.getElementById("dateFrom").value = "";
   document.getElementById("dateTo").value = "";
-  document.getElementById("headFilter").value = "";
+  document.getElementById("headTabs").innerHTML = "";
   document.getElementById("registerArea").innerHTML = "Search above, or just click Search to see the most recent receipts.";
 });
 
@@ -426,7 +456,6 @@ document.getElementById("logoutBtn").onclick = async () => {
   if (!profile) return;
   if (profile.role === "admin") document.getElementById("adminLink").classList.remove("hidden");
   headsIndex = await loadHeads();
-  populateSelect(document.getElementById("headFilter"), headsIndex.mainHeads, "All Heads");
 })();
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js");
