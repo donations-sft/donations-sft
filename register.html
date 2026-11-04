@@ -43,7 +43,10 @@
         <label for="dateTo">To</label>
         <input id="dateTo" type="date" />
       </div>
-      <div></div>
+      <div>
+        <label for="headFilter">Head</label>
+        <select id="headFilter"><option value="">All Heads</option></select>
+      </div>
     </div>
 
     <div class="actions-row" style="margin-top:10px;">
@@ -208,10 +211,12 @@ document.getElementById("searchBtn").addEventListener("click", async () => {
   const term = document.getElementById("searchBox").value.trim();
   const from = document.getElementById("dateFrom").value;
   const to = document.getElementById("dateTo").value;
+  const headId = document.getElementById("headFilter").value;
 
   let query = supabaseClient.from("receipts").select("*").order("receipt_date", { ascending: false }).limit(100);
   if (from) query = query.gte("receipt_date", from);
   if (to) query = query.lte("receipt_date", to);
+  if (headId) query = query.eq("main_head_id", headId);
   if (term) {
     const asNumber = parseInt(term, 10);
     if (!isNaN(asNumber) && String(asNumber) === term) {
@@ -233,11 +238,13 @@ document.getElementById("printReportBtn").addEventListener("click", () => {
   const term = document.getElementById("searchBox").value.trim();
   const from = document.getElementById("dateFrom").value;
   const to = document.getElementById("dateTo").value;
+  const headId = document.getElementById("headFilter").value;
 
   const filterParts = [];
   if (term) filterParts.push(`Search: "${term}"`);
   if (from) filterParts.push(`From: ${new Date(from).toLocaleDateString("en-IN")}`);
   if (to) filterParts.push(`To: ${new Date(to).toLocaleDateString("en-IN")}`);
+  if (headId) filterParts.push(`Head: ${headsIndex.nameOf(headId)}`);
   const filterLine = filterParts.length ? filterParts.join(" &middot; ") : "All receipts (most recent 100)";
 
   let total = 0;
@@ -288,6 +295,7 @@ document.getElementById("clearBtn").addEventListener("click", () => {
   document.getElementById("searchBox").value = "";
   document.getElementById("dateFrom").value = "";
   document.getElementById("dateTo").value = "";
+  document.getElementById("headFilter").value = "";
   document.getElementById("registerArea").innerHTML = "Search above, or just click Search to see the most recent receipts.";
 });
 
@@ -418,6 +426,7 @@ document.getElementById("logoutBtn").onclick = async () => {
   if (!profile) return;
   if (profile.role === "admin") document.getElementById("adminLink").classList.remove("hidden");
   headsIndex = await loadHeads();
+  populateSelect(document.getElementById("headFilter"), headsIndex.mainHeads, "All Heads");
 })();
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js");
