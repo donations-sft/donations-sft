@@ -51,11 +51,15 @@
 
   <div class="wide-card">
     <h2>Donation Heads</h2>
-    <p class="field-note">These are the top-level Heads donors' receipts can be assigned to.</p>
-    <ul id="headsList" style="margin: 8px 0 16px; padding-left: 20px;"></ul>
-    <label for="newHeadName">Add New Head</label>
+    <p class="field-note">Main Heads and their Sub Heads (if any).</p>
+    <div id="headsTree" style="margin: 8px 0 16px;"></div>
+
+    <label for="newHeadParent">Add Under</label>
+    <select id="newHeadParent"><option value="">— Top Level (new Main Head) —</option></select>
+
+    <label for="newHeadName">Head Name</label>
     <input id="newHeadName" type="text" placeholder="e.g. Scholarship Fund" />
-    <button id="addHeadBtn">Add Head</button>
+    <button id="addHeadBtn">Add</button>
     <div id="headsMsg"></div>
   </div>
 
@@ -85,6 +89,7 @@
 </div>
 
 <script src="supabase-client.js"></script>
+<script src="heads.js"></script>
 <script>
 function fmtAmt(n) {
   return Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2 });
@@ -209,33 +214,48 @@ async function loadUsers() {
   });
 }
 
-async function loadHeadsList() {
-  const { data, error } = await supabaseClient
-    .from("heads")
-    .select("id, name")
-    .is("parent_id", null)
-    .order("sort_order");
-  const list = document.getElementById("headsList");
-  list.innerHTML = "";
-  if (error) { list.innerHTML = "<li>" + error.message + "</li>"; return; }
-  data.forEach((h) => {
-    const li = document.createElement("li");
-    li.textContent = h.name;
-    list.appendChild(li);
+let headsIndex = null;
+
+async function loadHeadsTree() {
+  headsIndex = await loadHeads();
+
+  const tree = document.getElementById("headsTree");
+  let html = "<ul style='padding-left:20px; margin:0;'>";
+  headsIndex.mainHeads.forEach((main) => {
+    html += `<li>${main.name}`;
+    const children = headsIndex.childrenOf(main.id);
+    if (children.length) {
+      html += "<ul style='padding-left:20px;'>";
+      children.forEach((c) => { html += `<li>${c.name}</li>`; });
+      html += "</ul>";
+    }
+    html += "</li>";
+  });
+  html += "</ul>";
+  tree.innerHTML = html;
+
+  const parentSelect = document.getElementById("newHeadParent");
+  parentSelect.innerHTML = '<option value="">— Top Level (new Main Head) —</option>';
+  headsIndex.mainHeads.forEach((main) => {
+    const opt = document.createElement("option");
+    opt.value = main.id;
+    opt.textContent = "Under: " + main.name;
+    parentSelect.appendChild(opt);
   });
 }
 
 document.getElementById("addHeadBtn").addEventListener("click", async () => {
   const msg = document.getElementById("headsMsg");
   const name = document.getElementById("newHeadName").value.trim();
+  const parentId = document.getElementById("newHeadParent").value || null;
   if (!name) { msg.textContent = "Enter a head name."; msg.className = "msg error"; return; }
 
-  const { error } = await supabaseClient.rpc("admin_add_head", { p_name: name });
+  const { error } = await supabaseClient.rpc("admin_add_head", { p_name: name, p_parent_id: parentId });
   if (error) { msg.textContent = error.message; msg.className = "msg error"; return; }
   document.getElementById("newHeadName").value = "";
   msg.textContent = "Added.";
   msg.className = "msg info";
-  await loadHeadsList();
+  await loadHeadsTree();
 });
 
 async function loadSettings() {
@@ -278,7 +298,7 @@ let iAmSuperAdmin = false;
   const { data: { user } } = await supabaseClient.auth.getUser();
   document.getElementById("myEmail").textContent = user.email;
   await loadLiveTotals();
-  await loadHeadsList();
+  await loadHeadsTree();
   await loadPending();
   await loadUsers();
   await loadSettings();
