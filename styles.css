@@ -257,6 +257,63 @@ table.report-table tfoot td {
   color: #fff;
 }
 
+/* ── Dashboard: stat cards + colored function tiles ─────────────────── */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-top: 10px;
+}
+@media (max-width: 640px) {
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+}
+.stat-card {
+  background: #faf0ea;
+  border-radius: 10px;
+  padding: 16px 12px;
+  text-align: center;
+}
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #b91c1c;
+  line-height: 1.2;
+}
+.stat-label {
+  font-size: 0.78rem;
+  color: #6b6058;
+  margin-top: 4px;
+}
+
+.tile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin: 20px auto 0;
+  max-width: 760px;
+  padding: 0 20px;
+}
+@media (max-width: 520px) {
+  .tile-grid { grid-template-columns: 1fr; padding: 0 20px; }
+}
+.tile {
+  display: block;
+  border-radius: 12px;
+  padding: 22px 20px;
+  text-decoration: none;
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  transition: transform 0.1s ease;
+}
+.tile:hover { transform: translateY(-2px); }
+.tile-title { font-size: 1.05rem; font-weight: 700; }
+.tile-sub { font-size: 0.8rem; opacity: 0.9; margin-top: 4px; }
+
+.tile-red { background: linear-gradient(135deg, #b91c1c, #8f1414); }
+.tile-blue { background: linear-gradient(135deg, #2a5a8c, #1d3f63); }
+.tile-teal { background: linear-gradient(135deg, #1f7a68, #15584b); }
+.tile-gold { background: linear-gradient(135deg, #b8860b, #8a6508); }
+
 .actions-row {
   display: flex;
   gap: 10px;

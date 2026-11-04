@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Dashboard — SFT Donations</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#b91c1c" />
+<link rel="icon" href="icons/icon-192.png" type="image/png" />
+<link rel="stylesheet" href="styles.css" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brandline"><img src="icons/icon-192.png" alt="SFT" /><div class="brand-text"><span>Shroffs Foundation Trust</span><img class="brand-tagline-img" src="icons/tagline-white.png" alt="Seva Sadbhav Vikas" /></div></div>
+  <nav>
+    <a href="./dashboard.html">Dashboard</a>
+    <a href="./entry.html">New Receipt</a>
+    <a href="./register.html">Receipt Register</a>
+    <a href="./reports.html">Reports</a>
+    <a id="adminLink" href="./admin.html" class="hidden">Admin</a>
+  </nav>
+  <button id="logoutBtn">Log Out</button>
+</div>
+
+<div class="content">
+  <div class="wide-card">
+    <h2 id="welcomeMsg">Welcome</h2>
+
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="statReceiptsToday">—</div>
+        <div class="stat-label">Receipts Today</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statReceiptsTotal">—</div>
+        <div class="stat-label">Receipts (All Time)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statDonationsToday">—</div>
+        <div class="stat-label">Donations Today (₹)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statDonationsTotal">—</div>
+        <div class="stat-label">Donations (All Time, ₹)</div>
+      </div>
+    </div>
+    <p class="field-note">Updates automatically as new receipts come in.</p>
+  </div>
+
+  <div class="tile-grid">
+    <a href="./entry.html" class="tile tile-red">
+      <div class="tile-title">New Receipt</div>
+      <div class="tile-sub">Record a donation</div>
+    </a>
+    <a href="./register.html" class="tile tile-blue">
+      <div class="tile-title">Receipt Register</div>
+      <div class="tile-sub">Search, reprint, resend</div>
+    </a>
+    <a href="./reports.html" class="tile tile-teal">
+      <div class="tile-title">Reports</div>
+      <div class="tile-sub">Donor / Purpose / City wise</div>
+    </a>
+    <a href="./admin.html" class="tile tile-gold hidden" id="adminTile">
+      <div class="tile-title">Admin</div>
+      <div class="tile-sub">Users, Heads, Settings</div>
+    </a>
+  </div>
+
+  <div class="app-footer">
+    Powered by <a href="https://anyapps.in" target="_blank" rel="noopener">AnyApps</a>
+    &middot; <a href="./privacy.html">Privacy Policy</a>
+    &middot; Support: <a href="mailto:info.anyapps@gmail.com">info.anyapps@gmail.com</a>
+  </div>
+</div>
+
+<script src="supabase-client.js"></script>
+<script>
+function fmtAmt(n) {
+  return Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2 });
+}
+
+async function loadStats() {
+  const { data, error } = await supabaseClient.rpc("get_dashboard_stats");
+  if (error) { console.warn("dashboard stats:", error.message); return; }
+  const row = Array.isArray(data) ? data[0] : data;
+  document.getElementById("statReceiptsToday").textContent = row.receipts_today;
+  document.getElementById("statReceiptsTotal").textContent = row.receipts_cumulative;
+  document.getElementById("statDonationsToday").textContent = fmtAmt(row.donations_today);
+  document.getElementById("statDonationsTotal").textContent = fmtAmt(row.donations_cumulative);
+}
+
+document.getElementById("logoutBtn").onclick = async () => {
+  await supabaseClient.auth.signOut();
+  window.location.href = "./index.html";
+};
+
+(async () => {
+  const profile = await requireRole(["clerk", "admin"]);
+  if (!profile) return;
+
+  document.getElementById("welcomeMsg").textContent = "Welcome, " + (profile.full_name || "there") + (profile.role === "admin" ? " (Admin)" : " (Clerk)");
+  if (profile.role === "admin") {
+    document.getElementById("adminLink").classList.remove("hidden");
+    document.getElementById("adminTile").classList.remove("hidden");
+  }
+
+  await loadStats();
+
+  supabaseClient
+    .channel("dashboard-live")
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "receipts" }, () => {
+      loadStats();
+    })
+    .subscribe();
+})();
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js");
+</script>
+</body>
+</html>
