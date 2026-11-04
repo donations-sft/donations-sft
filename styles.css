@@ -129,6 +129,9 @@ button.secondary:hover { background: #fdf1f1; }
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
 .topbar .brandline {
