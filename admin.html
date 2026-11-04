@@ -69,6 +69,19 @@
   </div>
 
   <div class="wide-card">
+    <h2>Quick Add Chain</h2>
+    <p class="field-note">Create a Main Head, optionally with a Sub Head, optionally with a further Head under it — all in one go. Leave Sub/further blank if not needed.</p>
+    <label for="chainMain">Main Head *</label>
+    <input id="chainMain" type="text" placeholder="e.g. xxx" />
+    <label for="chainSub">Sub Head (optional)</label>
+    <input id="chainSub" type="text" placeholder="e.g. yyy" />
+    <label for="chainFurther">Further Head (optional, needs Sub Head above)</label>
+    <input id="chainFurther" type="text" placeholder="e.g. zzz" />
+    <button id="chainAddBtn">Create</button>
+    <div id="chainMsg"></div>
+  </div>
+
+  <div class="wide-card">
     <h2>My Account</h2>
     <p class="field-note">Current login email: <strong id="myEmail"></strong></p>
     <label for="newEmailInput">New Email</label>
@@ -305,6 +318,36 @@ document.getElementById("addHeadBtn").addEventListener("click", async () => {
   if (error) { msg.textContent = error.message; msg.className = "msg error"; return; }
   document.getElementById("newHeadName").value = "";
   msg.textContent = "Added.";
+  msg.className = "msg info";
+  await loadHeadsTree();
+});
+
+document.getElementById("chainAddBtn").addEventListener("click", async () => {
+  const msg = document.getElementById("chainMsg");
+  const mainName = document.getElementById("chainMain").value.trim();
+  const subName = document.getElementById("chainSub").value.trim();
+  const furtherName = document.getElementById("chainFurther").value.trim();
+
+  if (!mainName) { msg.textContent = "Main Head name is required."; msg.className = "msg error"; return; }
+  if (furtherName && !subName) { msg.textContent = "Enter a Sub Head name to add a further Head under it."; msg.className = "msg error"; return; }
+
+  const { data: mainRow, error: mainErr } = await supabaseClient.rpc("admin_add_head", { p_name: mainName, p_parent_id: null });
+  if (mainErr) { msg.textContent = mainErr.message; msg.className = "msg error"; return; }
+
+  if (subName) {
+    const { data: subRow, error: subErr } = await supabaseClient.rpc("admin_add_head", { p_name: subName, p_parent_id: mainRow.id });
+    if (subErr) { msg.textContent = `Main Head "${mainName}" created, but Sub Head failed: ${subErr.message}`; msg.className = "msg error"; await loadHeadsTree(); return; }
+
+    if (furtherName) {
+      const { error: furtherErr } = await supabaseClient.rpc("admin_add_head", { p_name: furtherName, p_parent_id: subRow.id });
+      if (furtherErr) { msg.textContent = `Main + Sub Head created, but further Head failed: ${furtherErr.message}`; msg.className = "msg error"; await loadHeadsTree(); return; }
+    }
+  }
+
+  document.getElementById("chainMain").value = "";
+  document.getElementById("chainSub").value = "";
+  document.getElementById("chainFurther").value = "";
+  msg.textContent = "Created.";
   msg.className = "msg info";
   await loadHeadsTree();
 });
