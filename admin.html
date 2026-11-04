@@ -88,6 +88,11 @@
     <input id="newEmailInput" type="email" placeholder="e.g. name@example.com" />
     <button id="changeEmailBtn">Update Email</button>
     <div id="emailChangeMsg"></div>
+
+    <label for="myNameInput" style="margin-top:18px;">My Name</label>
+    <input id="myNameInput" type="text" placeholder="e.g. Rajesh Shah" />
+    <button id="changeNameBtn">Update Name</button>
+    <div id="nameChangeMsg"></div>
   </div>
 
   <div class="wide-card">
@@ -383,6 +388,17 @@ document.getElementById("changeEmailBtn").addEventListener("click", async () => 
   msg.className = "msg info";
 });
 
+document.getElementById("changeNameBtn").addEventListener("click", async () => {
+  const msg = document.getElementById("nameChangeMsg");
+  const newName = document.getElementById("myNameInput").value.trim();
+  if (!newName) { msg.textContent = "Enter your name."; msg.className = "msg error"; return; }
+
+  const { error } = await supabaseClient.rpc("update_my_full_name", { p_name: newName });
+  if (error) { msg.textContent = error.message; msg.className = "msg error"; return; }
+  msg.textContent = "Saved.";
+  msg.className = "msg info";
+});
+
 let iAmSuperAdmin = false;
 
 (async () => {
@@ -391,6 +407,7 @@ let iAmSuperAdmin = false;
   iAmSuperAdmin = profile.is_super_admin === true;
   const { data: { user } } = await supabaseClient.auth.getUser();
   document.getElementById("myEmail").textContent = user.email;
+  document.getElementById("myNameInput").value = profile.full_name || "";
   await loadLiveTotals();
   await loadHeadsTree();
   await loadPending();

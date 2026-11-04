@@ -100,7 +100,8 @@ document.getElementById("logoutBtn").onclick = async () => {
   const profile = await requireRole(["clerk", "admin"]);
   if (!profile) return;
 
-  document.getElementById("welcomeMsg").textContent = "Welcome, " + (profile.full_name || "there") + (profile.role === "admin" ? " (Admin)" : " (Clerk)");
+  const namePart = profile.full_name ? ", " + profile.full_name : "";
+  document.getElementById("welcomeMsg").textContent = "Welcome" + namePart + (profile.role === "admin" ? " (Admin)" : " (Clerk)");
   if (profile.role === "admin") {
     document.getElementById("adminLink").classList.remove("hidden");
     document.getElementById("adminTile").classList.remove("hidden");
