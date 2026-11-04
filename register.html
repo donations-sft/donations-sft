@@ -49,6 +49,7 @@
     <div class="actions-row" style="margin-top:10px;">
       <button id="searchBtn">Search</button>
       <button id="clearBtn" class="secondary">Clear</button>
+      <button id="printReportBtn" class="secondary">Print This List</button>
     </div>
 
     <div id="registerMsg"></div>
@@ -86,10 +87,6 @@
       <div class="r-logo">
         <img src="icons/logo-full.png" alt="Shroffs Foundation Trust" class="r-logo-full" />
         <h2>Shroffs Foundation Trust</h2>
-      </div>
-      <div class="r-reg">
-        <div id="pReg80G" class="r-reg-number"></div>
-        <div id="pTaxNote"></div>
       </div>
     </div>
     <div class="r-title">Donation Receipt</div>
@@ -142,10 +139,7 @@ function fmtAmt(n) {
 }
 
 function purposeLabel(mainId, subId, furtherId) {
-  const parts = [headsIndex.nameOf(mainId)];
-  if (subId) parts.push(headsIndex.nameOf(subId));
-  if (furtherId) parts.push(headsIndex.nameOf(furtherId));
-  return parts.join(" / ");
+  return headsIndex.nameOf(mainId);
 }
 
 function amountInWords(num) {
@@ -233,6 +227,63 @@ document.getElementById("searchBtn").addEventListener("click", async () => {
   renderRegister(data);
 });
 
+document.getElementById("printReportBtn").addEventListener("click", () => {
+  if (!rows.length) { alert("Run a search first — nothing to print."); return; }
+
+  const term = document.getElementById("searchBox").value.trim();
+  const from = document.getElementById("dateFrom").value;
+  const to = document.getElementById("dateTo").value;
+
+  const filterParts = [];
+  if (term) filterParts.push(`Search: "${term}"`);
+  if (from) filterParts.push(`From: ${new Date(from).toLocaleDateString("en-IN")}`);
+  if (to) filterParts.push(`To: ${new Date(to).toLocaleDateString("en-IN")}`);
+  const filterLine = filterParts.length ? filterParts.join(" &middot; ") : "All receipts (most recent 100)";
+
+  let total = 0;
+  let tableRows = "";
+  rows.forEach((r) => {
+    const amountCell = r.payment_mode === "inkind" ? (r.item_description || "-") : fmtAmt(r.amount);
+    total += Number(r.amount) || 0;
+    tableRows += `<tr>
+      <td>${r.receipt_no}</td>
+      <td>${new Date(r.receipt_date).toLocaleDateString("en-IN")}</td>
+      <td>${r.donor_name}</td>
+      <td>${r.donor_city || "-"}</td>
+      <td>${purposeLabel(r.main_head_id)}</td>
+      <td>${r.payment_mode}</td>
+      <td style="text-align:right;">${amountCell}</td>
+    </tr>`;
+  });
+
+  const html = `<!doctype html><html><head><meta charset="utf-8" /><title>Donation Report</title>
+  <style>
+    body { font-family: Georgia, serif; color: #1f1a17; padding: 20px; }
+    h1 { color: #b91c1c; font-size: 1.3rem; margin-bottom: 4px; }
+    .filters { font-size: 0.9rem; color: #555; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { border-bottom: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+    th { background: #faf0ea; color: #6b2020; }
+    tfoot td { font-weight: bold; border-top: 2px solid #b91c1c; }
+    .printed-on { margin-top: 16px; font-size: 0.75rem; color: #888; }
+  </style>
+  </head><body>
+    <h1>Shroffs Foundation Trust — Donation Report</h1>
+    <div class="filters">${filterLine}</div>
+    <table>
+      <thead><tr><th>Receipt No</th><th>Date</th><th>Donor</th><th>City</th><th>Head</th><th>Mode</th><th style="text-align:right;">Amount</th></tr></thead>
+      <tbody>${tableRows}</tbody>
+      <tfoot><tr><td colspan="6">Total (excl. Inkind)</td><td style="text-align:right;">${fmtAmt(total)}</td></tr></tfoot>
+    </table>
+    <div class="printed-on">Printed on ${new Date().toLocaleString("en-IN")}</div>
+    <script>window.onload = () => window.print();<\/script>
+  </body></html>`;
+
+  const win = window.open("", "_blank");
+  win.document.write(html);
+  win.document.close();
+});
+
 document.getElementById("clearBtn").addEventListener("click", () => {
   document.getElementById("searchBox").value = "";
   document.getElementById("dateFrom").value = "";
@@ -242,14 +293,12 @@ document.getElementById("clearBtn").addEventListener("click", () => {
 
 function populatePrintArea(r) {
   const inkind = r.payment_mode === "inkind";
-  document.getElementById("pReg80G").textContent = TRUST_INFO.reg80G;
-  document.getElementById("pTaxNote").textContent = TRUST_INFO.taxNote;
   document.getElementById("pReceiptNo").textContent = r.receipt_no;
   document.getElementById("pDate").textContent = new Date(r.receipt_date).toLocaleDateString("en-IN");
   document.getElementById("pDonor").textContent = r.donor_name;
   document.getElementById("pPurpose").textContent = purposeLabel(r.main_head_id, r.sub_head_id, r.further_head_id);
   document.getElementById("pTrustReg").textContent = TRUST_INFO.trustReg + "   " + TRUST_INFO.pan;
-  document.getElementById("pCommissionerNote").textContent = TRUST_INFO.commissionerNote;
+  document.getElementById("pCommissionerNote").textContent = TRUST_INFO.reg80G + "   " + TRUST_INFO.taxNote;
   document.getElementById("pAddress").textContent = TRUST_INFO.address;
   document.getElementById("pContact").textContent = TRUST_INFO.phone + "   Email: " + TRUST_INFO.email + "   Website: " + TRUST_INFO.website;
 

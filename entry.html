@@ -144,10 +144,6 @@
         <img src="icons/logo-full.png" alt="Shroffs Foundation Trust" class="r-logo-full" />
         <h2>Shroffs Foundation Trust</h2>
       </div>
-      <div class="r-reg">
-        <div id="pReg80G" class="r-reg-number"></div>
-        <div id="pTaxNote"></div>
-      </div>
     </div>
     <div class="r-title">Donation Receipt</div>
     <div class="r-noDate">
@@ -300,10 +296,7 @@ function formatWhatsAppNumber(phone) {
 }
 
 function purposeLabel(mainId, subId, furtherId) {
-  const parts = [headsIndex.nameOf(mainId)];
-  if (subId) parts.push(headsIndex.nameOf(subId));
-  if (furtherId) parts.push(headsIndex.nameOf(furtherId));
-  return parts.join(" / ");
+  return headsIndex.nameOf(mainId);
 }
 
 function showMsg(text, type) {
@@ -417,14 +410,12 @@ document.getElementById("newReceiptBtn").addEventListener("click", () => {
 function populatePrintArea(r) {
   const inkind = r.payment_mode === "inkind";
 
-  document.getElementById("pReg80G").textContent = TRUST_INFO.reg80G;
-  document.getElementById("pTaxNote").textContent = TRUST_INFO.taxNote;
   document.getElementById("pReceiptNo").textContent = r.receipt_no;
   document.getElementById("pDate").textContent = new Date(r.receipt_date).toLocaleDateString("en-IN");
   document.getElementById("pDonor").textContent = r.donor_name;
   document.getElementById("pPurpose").textContent = r.purpose;
   document.getElementById("pTrustReg").textContent = TRUST_INFO.trustReg + "   " + TRUST_INFO.pan;
-  document.getElementById("pCommissionerNote").textContent = TRUST_INFO.commissionerNote;
+  document.getElementById("pCommissionerNote").textContent = TRUST_INFO.reg80G + "   " + TRUST_INFO.taxNote;
   document.getElementById("pAddress").textContent = TRUST_INFO.address;
   document.getElementById("pContact").textContent = TRUST_INFO.phone + "   Email: " + TRUST_INFO.email + "   Website: " + TRUST_INFO.website;
 

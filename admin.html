@@ -49,6 +49,16 @@
   </div>
 
   <div class="wide-card">
+    <h2>Donation Heads</h2>
+    <p class="field-note">These are the top-level Heads donors' receipts can be assigned to.</p>
+    <ul id="headsList" style="margin: 8px 0 16px; padding-left: 20px;"></ul>
+    <label for="newHeadName">Add New Head</label>
+    <input id="newHeadName" type="text" placeholder="e.g. Scholarship Fund" />
+    <button id="addHeadBtn">Add Head</button>
+    <div id="headsMsg"></div>
+  </div>
+
+  <div class="wide-card">
     <h2>My Account</h2>
     <p class="field-note">Current login email: <strong id="myEmail"></strong></p>
     <label for="newEmailInput">New Email</label>
@@ -198,6 +208,35 @@ async function loadUsers() {
   });
 }
 
+async function loadHeadsList() {
+  const { data, error } = await supabaseClient
+    .from("heads")
+    .select("id, name")
+    .is("parent_id", null)
+    .order("sort_order");
+  const list = document.getElementById("headsList");
+  list.innerHTML = "";
+  if (error) { list.innerHTML = "<li>" + error.message + "</li>"; return; }
+  data.forEach((h) => {
+    const li = document.createElement("li");
+    li.textContent = h.name;
+    list.appendChild(li);
+  });
+}
+
+document.getElementById("addHeadBtn").addEventListener("click", async () => {
+  const msg = document.getElementById("headsMsg");
+  const name = document.getElementById("newHeadName").value.trim();
+  if (!name) { msg.textContent = "Enter a head name."; msg.className = "msg error"; return; }
+
+  const { error } = await supabaseClient.rpc("admin_add_head", { p_name: name });
+  if (error) { msg.textContent = error.message; msg.className = "msg error"; return; }
+  document.getElementById("newHeadName").value = "";
+  msg.textContent = "Added.";
+  msg.className = "msg info";
+  await loadHeadsList();
+});
+
 async function loadSettings() {
   const { data, error } = await supabaseClient.rpc("admin_get_next_receipt_no");
   if (!error) document.getElementById("nextReceiptNo").value = data;
@@ -238,6 +277,7 @@ let iAmSuperAdmin = false;
   const { data: { user } } = await supabaseClient.auth.getUser();
   document.getElementById("myEmail").textContent = user.email;
   await loadLiveTotals();
+  await loadHeadsList();
   await loadPending();
   await loadUsers();
   await loadSettings();

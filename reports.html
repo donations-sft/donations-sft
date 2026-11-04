@@ -153,10 +153,7 @@ document.getElementById("quickRange").addEventListener("change", (e) => {
 });
 
 function purposeOf(row) {
-  const parts = [headsIndex.nameOf(row.main_head_id)];
-  if (row.sub_head_id) parts.push(headsIndex.nameOf(row.sub_head_id));
-  if (row.further_head_id) parts.push(headsIndex.nameOf(row.further_head_id));
-  return parts.join(" / ");
+  return headsIndex.nameOf(row.main_head_id);
 }
 
 function fmtAmt(n) {
