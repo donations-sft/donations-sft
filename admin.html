@@ -51,11 +51,16 @@
 
   <div class="wide-card">
     <h2>Donation Heads</h2>
-    <p class="field-note">Main Heads and their Sub Heads (if any).</p>
+    <p class="field-note">Main Heads, Sub Heads and further Heads. Edit/Delete is next to each.</p>
     <div id="headsTree" style="margin: 8px 0 16px;"></div>
 
-    <label for="newHeadParent">Add Under</label>
-    <select id="newHeadParent"><option value="">— Top Level (new Main Head) —</option></select>
+    <label for="newHeadMain">Add Under</label>
+    <select id="newHeadMain"><option value="">— Top Level (new Main Head) —</option></select>
+
+    <div id="newHeadSubWrap" class="hidden">
+      <label for="newHeadSub">Sub Level</label>
+      <select id="newHeadSub"></select>
+    </div>
 
     <label for="newHeadName">Head Name</label>
     <input id="newHeadName" type="text" placeholder="e.g. Scholarship Fund" />
@@ -216,38 +221,84 @@ async function loadUsers() {
 
 let headsIndex = null;
 
+function renderHeadNode(head) {
+  const children = headsIndex.childrenOf(head.id);
+  let html = `<li>
+    <span class="headNameSpan" data-id="${head.id}">${head.name}</span>
+    <button class="secondary headEditBtn" data-id="${head.id}" style="width:auto; padding:2px 8px; font-size:0.75rem; margin-left:6px;">Edit</button>
+    <button class="secondary headDeleteBtn" data-id="${head.id}" data-name="${head.name.replace(/"/g, '&quot;')}" style="width:auto; padding:2px 8px; font-size:0.75rem; margin-left:4px;">Delete</button>`;
+  if (children.length) {
+    html += "<ul style='padding-left:20px;'>";
+    children.forEach((c) => { html += renderHeadNode(c); });
+    html += "</ul>";
+  }
+  html += "</li>";
+  return html;
+}
+
 async function loadHeadsTree() {
   headsIndex = await loadHeads();
 
   const tree = document.getElementById("headsTree");
   let html = "<ul style='padding-left:20px; margin:0;'>";
-  headsIndex.mainHeads.forEach((main) => {
-    html += `<li>${main.name}`;
-    const children = headsIndex.childrenOf(main.id);
-    if (children.length) {
-      html += "<ul style='padding-left:20px;'>";
-      children.forEach((c) => { html += `<li>${c.name}</li>`; });
-      html += "</ul>";
-    }
-    html += "</li>";
-  });
+  headsIndex.mainHeads.forEach((main) => { html += renderHeadNode(main); });
   html += "</ul>";
   tree.innerHTML = html;
 
-  const parentSelect = document.getElementById("newHeadParent");
-  parentSelect.innerHTML = '<option value="">— Top Level (new Main Head) —</option>';
+  document.querySelectorAll(".headEditBtn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const span = document.querySelector(`.headNameSpan[data-id="${btn.dataset.id}"]`);
+      const current = span.textContent;
+      const newName = prompt("Rename head:", current);
+      if (newName === null || newName.trim() === "" || newName.trim() === current) return;
+      const { error } = await supabaseClient.rpc("admin_rename_head", { p_head_id: btn.dataset.id, p_name: newName.trim() });
+      if (error) { alert(error.message); return; }
+      await loadHeadsTree();
+    });
+  });
+
+  document.querySelectorAll(".headDeleteBtn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!confirm(`Delete "${btn.dataset.name}"? This cannot be undone, and will fail if it (or any sub-head under it) is already used on a receipt.`)) return;
+      const { error } = await supabaseClient.rpc("admin_delete_head", { p_head_id: btn.dataset.id });
+      if (error) { alert(error.message); return; }
+      await loadHeadsTree();
+    });
+  });
+
+  const mainSelect = document.getElementById("newHeadMain");
+  mainSelect.innerHTML = '<option value="">— Top Level (new Main Head) —</option>';
   headsIndex.mainHeads.forEach((main) => {
     const opt = document.createElement("option");
     opt.value = main.id;
     opt.textContent = "Under: " + main.name;
-    parentSelect.appendChild(opt);
+    mainSelect.appendChild(opt);
   });
+  document.getElementById("newHeadSubWrap").classList.add("hidden");
+  document.getElementById("newHeadSub").innerHTML = "";
 }
+
+document.getElementById("newHeadMain").addEventListener("change", (e) => {
+  const subWrap = document.getElementById("newHeadSubWrap");
+  const subSelect = document.getElementById("newHeadSub");
+  const mainId = e.target.value;
+  if (!mainId) { subWrap.classList.add("hidden"); return; }
+
+  const children = headsIndex.childrenOf(mainId);
+  if (children.length) {
+    populateSelect(subSelect, children, "— New Sub Head under this Main Head —");
+    subWrap.classList.remove("hidden");
+  } else {
+    subWrap.classList.add("hidden");
+  }
+});
 
 document.getElementById("addHeadBtn").addEventListener("click", async () => {
   const msg = document.getElementById("headsMsg");
   const name = document.getElementById("newHeadName").value.trim();
-  const parentId = document.getElementById("newHeadParent").value || null;
+  const mainId = document.getElementById("newHeadMain").value;
+  const subId = document.getElementById("newHeadSub").value;
+  const parentId = mainId ? (subId || mainId) : null;
   if (!name) { msg.textContent = "Enter a head name."; msg.className = "msg error"; return; }
 
   const { error } = await supabaseClient.rpc("admin_add_head", { p_name: name, p_parent_id: parentId });
